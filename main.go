@@ -17,14 +17,15 @@ import (
 )
 
 const (
-	censorDevicePath       = "/sys/bus/w1/devices/28-3c01d607cfc6/w1_slave"
-	errTemp          int32 = -1000
-	maxRetries             = 10
+	censorDevicePath        = "/sys/bus/w1/devices/28-3c01d607cfc6/w1_slave"
+	errTemp           int32 = -1000
+	maxRetries              = 10
+	minRereshInterval       = 5 * time.Second
 )
 
 var (
 	lastTemp int32 = errTemp
-	lastTime       = time.Now()
+	lastTime       = time.Now().Local().Add(-minRereshInterval)
 )
 
 func main() {
@@ -139,6 +140,11 @@ func getTemperatureReading(fpath string) (int32, error) {
 }
 
 func getTemperatureReadingWithRetries(fpath string, retries int) (temperature int32, err error) {
+	// do not allow more frequent polls
+	if time.Now().Sub(lastTime) < minRereshInterval {
+		return atomic.LoadInt32(&lastTemp), nil
+	}
+
 	if retries > maxRetries {
 		retries = maxRetries
 	} else if retries <= 0 {
@@ -147,7 +153,10 @@ func getTemperatureReadingWithRetries(fpath string, retries int) (temperature in
 
 	for ; retries >= 0; retries-- {
 		if temperature, err = getTemperatureReading(fpath); err == nil {
-			break
+			// sometimes the temperature is just not refreshed by a sensor. Retry few times
+			if lt := atomic.LoadInt32(&lastTemp); lt != temperature {
+				break
+			}
 		}
 		time.Sleep(100 * time.Millisecond)
 	}

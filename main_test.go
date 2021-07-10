@@ -3,6 +3,7 @@ package main
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -41,10 +42,17 @@ func Test004_tempParseFilePersistent(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, int32(29812), v)
 
+	v, err = getTemperatureReadingWithRetries("testdata"+censorDevicePath, 1000)
+	assert.NoError(t, err)
+	assert.Equal(t, int32(29812), v)
+
+	lastTime = time.Now().Add(-minRereshInterval)
 	v, err = getTemperatureReadingWithRetries("testdata"+censorDevicePath, -1)
 	assert.NoError(t, err)
 	assert.Equal(t, int32(29812), v)
 
+	lastTime = time.Now().Add(-minRereshInterval)
+	lastTemp = errTemp
 	v, err = getTemperatureReadingWithRetries("testdata"+censorDevicePath, 0)
 	assert.NoError(t, err)
 	assert.Equal(t, int32(29812), v)
