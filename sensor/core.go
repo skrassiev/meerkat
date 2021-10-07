@@ -28,7 +28,7 @@ var (
 	lastTime       = time.Now().Local().Add(-minRereshInterval)
 )
 
-func Main() {
+func ServeBotAPI(sighandler <-chan os.Signal, runtime string) (string, error) {
 	bot, err := tgbotapi.NewBotAPI(os.Getenv("TELEGRAM_APITOKEN"))
 	if err != nil {
 		panic(err)
@@ -63,39 +63,48 @@ func Main() {
 	updates := bot.GetUpdatesChan(updateConfig)
 
 	// Let's go through each update that we're getting from Telegram.
-	for update := range updates {
-		// Telegram can send many types of updates depending on what your Bot
-		// is up to. We only want to look at messages for now, so we can
-		// discard any other updates.
-		if update.Message == nil {
-			continue
-		}
+	for {
+		select {
+		case s := <-sighandler:
+			if s == os.Interrupt {
+				return fmt.Sprintf("%s was interruped by system signal", runtime), nil
+			}
+			return fmt.Sprintf("%s was killed", runtime), nil
 
-		if _, found := allowedChatIDs[update.Message.Chat.ID]; !found {
-			log.Println("received", update.Message.Text[:10], "message from unknown chat")
-			continue
-		}
+		case update := <-updates:
+			// Telegram can send many types of updates depending on what your Bot
+			// is up to. We only want to look at messages for now, so we can
+			// discard any other updates.
+			if update.Message == nil {
+				continue
+			}
 
-		if update.Message.Text == "/temp" || update.Message.Text == "/temp@gsnowmelt_bot" {
+			if _, found := allowedChatIDs[update.Message.Chat.ID]; !found {
+				log.Println("received", update.Message.Text[:10], "message from unknown chat")
+				continue
+			}
 
-			v, _ := getTemperatureReadingWithRetries(sensorDevicePath, 10)
+			if update.Message.Text == "/temp" || update.Message.Text == "/temp@gsnowmelt_bot" {
 
-			// Now that we know we've gotten a new message, we can construct a
-			// reply! We'll take the Chat ID and Text from the incoming message
-			// and use it to create a new message.
-			msg := tgbotapi.NewMessage(update.Message.Chat.ID, fmt.Sprintf("%v ℃ 🌡 on %v", float32(v)/1000.0, lastTime.Format("Jan 2 15:04:05")))
-			// We'll also say that this message is a reply to the previous message.
-			// For any other specifications than Chat ID or Text, you'll need to
-			// set fields on the `MessageConfig`.
-			// msg.ReplyToMessageID = update.Message.MessageID
+				v, _ := getTemperatureReadingWithRetries(sensorDevicePath, 10)
 
-			// Okay, we're sending our message off! We don't care about the message
-			// we just sent, so we'll discard it.
-			if _, err := bot.Send(msg); err != nil {
-				// Note that panics are a bad way to handle errors. Telegram can
-				// have service outages or network errors, you should retry sending
-				// messages or more gracefully handle failures.
-				panic(err)
+				// Now that we know we've gotten a new message, we can construct a
+				// reply! We'll take the Chat ID and Text from the incoming message
+				// and use it to create a new message.
+				msg := tgbotapi.NewMessage(update.Message.Chat.ID, fmt.Sprintf("%v ℃ 🌡 on %v", float32(v)/1000.0, lastTime.Format("Jan 2 15:04:05")))
+				// We'll also say that this message is a reply to the previous message.
+				// For any other specifications than Chat ID or Text, you'll need to
+				// set fields on the `MessageConfig`.
+				// msg.ReplyToMessageID = update.Message.MessageID
+
+				// Okay, we're sending our message off! We don't care about the message
+				// we just sent, so we'll discard it.
+				if _, err := bot.Send(msg); err != nil {
+					// Note that panics are a bad way to handle errors. Telegram can
+					// have service outages or network errors, you should retry sending
+					// messages or more gracefully handle failures.
+					panic(err)
+				}
 			}
 		}
 	}

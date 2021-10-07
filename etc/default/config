@@ -1,0 +1,4 @@
+TELEGRAM_APITOKEN=
+# CHAT_ID is a comma-separated list of trusted Telegram Chat IDs, which can query the bot
+CHAT_ID=
+
