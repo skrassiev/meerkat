@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"strconv"
 	"strings"
@@ -21,6 +22,8 @@ const (
 	errTemp           int32 = -1000
 	maxRetries              = 10
 	minRereshInterval       = 5 * time.Second
+	httpTimeout             = 30 * time.Second
+	retryInterval           = 2 * time.Second
 )
 
 var (
@@ -29,15 +32,71 @@ var (
 	tickerInterval       = time.Second * 5
 )
 
+type interruptedErr struct {
+	msg string
+}
+
+func (e interruptedErr) Error() string {
+	return e.msg
+}
+
+// retries operation and watches for interrupt. Never return an error on success
+func retryTillInterrupt(f func() error, sighandler <-chan os.Signal, runtime string) error {
+	for {
+		if err := f(); err != nil {
+			log.Println("Telegram API failiure", err)
+			select {
+			case s := <-sighandler:
+				if s == os.Interrupt {
+					return interruptedErr{fmt.Sprintf("%s was interruped by system signal", runtime)}
+				}
+				return interruptedErr{fmt.Sprintf("%s was killed", runtime)}
+			case <-time.After(retryInterval):
+				continue
+			}
+		}
+		break
+	}
+	return nil
+}
+
 // handler for a single command
 type commandHandler func(cmd *tgbotapi.Message, bot *tgbotapi.BotAPI) (response tgbotapi.MessageConfig)
 type unsolicitedReportFunc func() string
 
 // ServeBotAPI is the main function
 func ServeBotAPI(sighandler <-chan os.Signal, runtime string) (string, error) {
-	bot, err := tgbotapi.NewBotAPI(os.Getenv("TELEGRAM_APITOKEN"))
-	if err != nil {
-		panic(err)
+
+	var (
+		bot *tgbotapi.BotAPI
+		err error
+		c   = &http.Client{Timeout: httpTimeout}
+	)
+
+	log.Println("launching sensor service")
+
+	//	for {
+	//		if bot, err = tgbotapi.NewBotAPIWithClient(os.Getenv("TELEGRAM_APITOKEN"), c); err != nil {
+	//			log.Println("failed to instantiate Telegram API client", err)
+	//			select {
+	//			case s := <-sighandler:
+	//				if s == os.Interrupt {
+	//					return fmt.Sprintf("%s was interruped by system signal", runtime), nil
+	//				}
+	//				return fmt.Sprintf("%s was killed", runtime), nil
+	//			case <-time.After(retryInterval):
+	//				continue
+	//			}
+	//		}
+	//		break
+	//	}
+	//
+
+	if err = retryTillInterrupt(func() error {
+		bot, err = tgbotapi.NewBotAPIWithClient(os.Getenv("TELEGRAM_APITOKEN"), c)
+		return err
+	}, sighandler, runtime); err != nil {
+		return err.Error(), nil
 	}
 
 	strChatIDs := strings.Split(strings.TrimSpace(os.Getenv("CHAT_ID")), ",")
@@ -68,7 +127,7 @@ func ServeBotAPI(sighandler <-chan os.Signal, runtime string) (string, error) {
 	// Tell Telegram we should wait up to 30 seconds on each request for an
 	// update. This way we can get information just as quickly as making many
 	// frequent requests without having to send nearly as many.
-	updateConfig.Timeout = 30
+	updateConfig.Timeout = int(httpTimeout/time.Second - 1)
 
 	// Start polling Telegram for updates.
 	updates := bot.GetUpdatesChan(updateConfig)
@@ -96,7 +155,6 @@ func ServeBotAPI(sighandler <-chan os.Signal, runtime string) (string, error) {
 			}
 			return fmt.Sprintf("%s was killed", runtime), nil
 		case t := <-tm.C:
-			log.Println("timer fired", t)
 			for _, h := range periodicUpdates {
 				notificationMessageWrapper(h.intro, h.fn, bot, chatIDs)
 			}
@@ -117,11 +175,13 @@ func ServeBotAPI(sighandler <-chan os.Signal, runtime string) (string, error) {
 			if h, exists := handlers[update.Message.Text]; exists {
 				// Okay, we're sending our message off! We don't care about the message
 				// we just sent, so we'll discard it.
-				if _, err := bot.Send(h(update.Message, bot)); err != nil {
-					// Note that panics are a bad way to handle errors. Telegram can
-					// have service outages or network errors, you should retry sending
-					// messages or more gracefully handle failures.
-					panic(err)
+				log.Println("before sleep")
+				time.Sleep(time.Second * 5)
+				if err = retryTillInterrupt(func() error {
+					_, err := bot.Send(h(update.Message, bot))
+					return err
+				}, sighandler, runtime); err != nil {
+					return err.Error(), nil
 				}
 			}
 		}
