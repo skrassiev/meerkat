@@ -12,6 +12,7 @@ import (
 func main() {
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt, os.Kill, syscall.SIGTERM)
+
 	status, err := sensor.ServeBotAPI(interrupt, "process")
 	if err == nil {
 		log.Println(status)
