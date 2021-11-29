@@ -29,7 +29,7 @@ const (
 var (
 	lastTemp       int32 = errTemp
 	lastTime             = time.Now().Local().Add(-minRereshInterval)
-	tickerInterval       = time.Second * 5
+	tickerInterval       = time.Second * 60 * 5
 )
 
 type interruptedErr struct {
@@ -154,7 +154,7 @@ func ServeBotAPI(sighandler <-chan os.Signal, runtime string) (string, error) {
 				return fmt.Sprintf("%s was interruped by system signal", runtime), nil
 			}
 			return fmt.Sprintf("%s was killed", runtime), nil
-		case t := <-tm.C:
+		case <-tm.C:
 			for _, h := range periodicUpdates {
 				notificationMessageWrapper(h.intro, h.fn, bot, chatIDs)
 			}
