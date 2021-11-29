@@ -17,7 +17,6 @@ var (
 
 func onError(msg string, arg interface{}) string {
 	log.Println(msg, arg)
-	publicIP = net.IP{}
 	return ""
 }
 
@@ -30,7 +29,7 @@ func getPublicIP() (ip_address string) {
 	// ifconfig.io does not like programmatic access
 	req.Header.Add("User-Agent", "curl/7.74.0")
 
-	c := &http.Client{Timeout: time.Second * 5}
+	c := &http.Client{Timeout: time.Second * 30}
 	resp, err := c.Do(req)
 
 	if err != nil {
