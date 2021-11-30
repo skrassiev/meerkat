@@ -175,8 +175,6 @@ func ServeBotAPI(sighandler <-chan os.Signal, runtime string) (string, error) {
 			if h, exists := handlers[update.Message.Text]; exists {
 				// Okay, we're sending our message off! We don't care about the message
 				// we just sent, so we'll discard it.
-				log.Println("before sleep")
-				time.Sleep(time.Second * 5)
 				if err = retryTillInterrupt(func() error {
 					_, err := bot.Send(h(update.Message, bot))
 					return err
