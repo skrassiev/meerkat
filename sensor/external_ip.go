@@ -20,7 +20,8 @@ func onError(msg string, arg interface{}) string {
 	return ""
 }
 
-func getPublicIP() (ip_address string) {
+//GetPublicIP returns current public IP of the system as a string. Returns emptry string if not changed or could not be determined
+func GetPublicIP() (ip_address string) {
 	req, err := http.NewRequest(http.MethodGet, publicIPResolverURL, nil)
 	if err != nil {
 		return onError("error getting public IP", err)
