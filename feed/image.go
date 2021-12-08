@@ -28,7 +28,7 @@ func getRemotePictureAsBytes(url string) (body io.ReadCloser, bodyLen int64, err
 	return nil, 0, nil
 }
 
-//GetPictureByURL serves an image from a remote URL
+// GetPictureByURL serves an image from a remote URL.
 func GetPictureByURL(fileURL string) telega.CommandHandler {
 	return func(cmd *tgbotapi.Message, _ *tgbotapi.BotAPI) (response telega.ChattableCloser, _ error) {
 		body, len, err := getRemotePictureAsBytes(fileURL)

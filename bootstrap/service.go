@@ -12,10 +12,10 @@ import (
 	"github.com/skrassiev/gsnowmelt_bot/telega"
 )
 
-// Main adds standard handlers to the telega bot
+// Main adds standard handlers to the telega bot.
 func Main(runtime string) (status string, err error) {
 	interrupt := make(chan os.Signal, 1)
-	signal.Notify(interrupt, os.Interrupt, os.Kill, syscall.SIGTERM)
+	signal.Notify(interrupt, os.Interrupt, syscall.SIGTERM)
 
 	var bot telega.Bot
 	if err = bot.Init(interrupt, runtime); err != nil {

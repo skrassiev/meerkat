@@ -12,7 +12,7 @@ import (
 
 var (
 	publicIP             net.IP
-	publicIPResolverURLs = []string{"http://ifconfig.io", "https://api.ipify.org"}
+	publicIPResolverURLs = []string{"http:// ifconfig.io", "https://api.ipify.org"}
 	publicIPResolverURL  = publicIPResolverURLs[1]
 )
 
@@ -21,8 +21,8 @@ func onError(msg string, arg interface{}) string {
 	return ""
 }
 
-//PublicIP returns current public IP of the system as a string. Returns emptry string if not changed or could not be determined
-func PublicIP() (ip_address string) {
+// PublicIP returns current public IP of the system as a string. Returns emptry string if not changed or could not be determined.
+func PublicIP() (ipAddress string) {
 	req, err := http.NewRequest(http.MethodGet, publicIPResolverURL, nil)
 	if err != nil {
 		return onError("error getting public IP", err)
@@ -59,10 +59,8 @@ func PublicIP() (ip_address string) {
 				}
 			}
 			return onError("error parsing public IP:", string(body))
-
 		}
 		return onError("error getting public IP:", err)
-
 	}
 	return onError("error code getting public IP", fmt.Sprintf("%d %s", resp.StatusCode, resp.Status))
 }

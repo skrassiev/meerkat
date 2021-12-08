@@ -25,12 +25,11 @@ const (
 )
 
 var (
-	lastTemp       int32 = errTemp
-	lastTime             = time.Now().Local().Add(-minRereshInterval)
-	tickerInterval       = time.Second * 60 * 5
+	lastTemp = errTemp
+	lastTime = time.Now().Local().Add(-minRereshInterval)
 )
 
-// HandlerCommandTemp reads temp from a sensor and reponds in a telegram message
+// HandlerCommandTemp reads temp from a sensor and reponds in a telegram message.
 func HandleCommandlTemp(cmd *tgbotapi.Message, _ *tgbotapi.BotAPI) (response telega.ChattableCloser, _ error) {
 	v, _ := getTemperatureReadingWithRetries(sensorDevicePath, 10)
 	// Now that we know we've gotten a new message, we can construct a
@@ -41,7 +40,7 @@ func HandleCommandlTemp(cmd *tgbotapi.Message, _ *tgbotapi.BotAPI) (response tel
 	// For any other specifications than Chat ID or Text, you'll need to
 	// set fields on the `MessageConfig`.
 	// msg.ReplyToMessageID = update.Message.MessageID
-	return telega.ChattableText{r}, nil
+	return telega.ChattableText{Chattable: r}, nil
 }
 
 func scanTemperatureReading(reader io.Reader) (int32, error) {
@@ -58,11 +57,10 @@ func scanTemperatureReading(reader io.Reader) (int32, error) {
 						log.Println(err, st[1])
 						return errTemp, err
 					}
-					return int32(ret), nil
+					return int32(ret & 0xffffffff), nil
 				}
 				log.Println("could not parse", ts)
 				return errTemp, fmt.Errorf("could not parse %v", ts)
-
 			}
 		}
 	}
@@ -84,7 +82,7 @@ func getTemperatureReading(fpath string) (int32, error) {
 
 func getTemperatureReadingWithRetries(fpath string, retries int) (temperature int32, err error) {
 	// do not allow more frequent polls
-	if time.Now().Sub(lastTime) < minRereshInterval {
+	if time.Since(lastTime) < minRereshInterval {
 		return atomic.LoadInt32(&lastTemp), nil
 	}
 
