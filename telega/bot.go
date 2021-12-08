@@ -14,9 +14,9 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
-// handler for a single command
+// handler for a single command.
 
-// ChattableCloser is a chattable message, which is closed after use
+// ChattableCloser is a chattable message, which is closed after use.
 type ChattableCloser interface {
 	tgbotapi.Chattable
 	io.Closer
@@ -33,7 +33,7 @@ func (c ChattableText) Close() error {
 type CommandHandler func(cmd *tgbotapi.Message, bot *tgbotapi.BotAPI) (response ChattableCloser, err error)
 type TaskFunction func() string
 
-// define periodic functions
+// define periodic functions.
 type periodicTaskDef struct {
 	interval uint32
 	intro    string
@@ -64,18 +64,20 @@ type Bot struct {
 	periodicTaskCycle uint32
 }
 
-// Init initializes telegram bot
+// Init initializes telegram bot.
 func (b *Bot) Init(signals <-chan os.Signal, runtime string) error {
-
 	var err error
 
 	log.Println("connecting bot client to API")
 
 	c := &http.Client{Timeout: httpTimeout}
-	if err = retryTillInterrupt(func() error {
+	err = retryTillInterrupt(func() error {
 		b.bot, err = tgbotapi.NewBotAPIWithClient(os.Getenv("TELEGRAM_APITOKEN"), c)
+
 		return err
-	}, signals, runtime); err != nil {
+	}, signals, runtime)
+
+	if err != nil {
 		return err
 	}
 
@@ -86,36 +88,38 @@ func (b *Bot) Init(signals <-chan os.Signal, runtime string) error {
 	return nil
 }
 
-// AddHandler registers a new handler function against a command string
+// AddHandler registers a new handler function against a command string.
 func (b *Bot) AddHandler(cmd string, handler CommandHandler) {
 	if b.cmdHandlers == nil {
 		b.cmdHandlers = make(map[string]CommandHandler)
 	}
+
 	log.Println("registered command:", cmd)
+
 	b.cmdHandlers[cmd] = handler
 }
 
-//AddPeriodicTask registers a periodic task. Param 'interval' should be an increment of 5 mins, or it will be aligned to the next 5 mins boundary.
+// AddPeriodicTask registers a periodic task.
+// Param 'interval' should be an increment of 5 mins, or it will be aligned to the next 5 mins boundary.
 func (b *Bot) AddPeriodicTask(interval time.Duration, reportMessage string, fn TaskFunction) {
-
 	taskDef := periodicTaskDef{intro: reportMessage, fn: fn}
 
 	if interval == 0 {
 		taskDef.interval = 1
 	} else {
 		fullIntervals := float64(interval) / float64(minPeriodicInterval)
-		if fullIntervals != float64(math.Floor(fullIntervals)) {
-			fullIntervals += 1
+		if fullIntervals != math.Floor(fullIntervals) {
+			fullIntervals++
 		}
 		taskDef.interval = uint32(math.Floor(fullIntervals))
 	}
+
 	log.Println("added task to run every", uint32(time.Duration(taskDef.interval)*minPeriodicInterval/time.Minute), "minutes")
 	b.periodicTasks = append(b.periodicTasks, taskDef)
 }
 
-// Run starts the bot till interrupted
+// Run starts the bot till interrupted.
 func (b Bot) Run() (string, error) {
-
 	// parse restrictions
 	strChatIDs := strings.Split(strings.TrimSpace(os.Getenv("CHAT_ID")), ",")
 	if len(strChatIDs) == 0 {
@@ -132,7 +136,9 @@ func (b Bot) Run() (string, error) {
 		if err != nil {
 			log.Fatal("failed to parse chatID", v)
 		}
+
 		allowedChatIDs[vv] = struct{}{}
+
 		chatIDs = append(chatIDs, vv)
 	}
 
@@ -149,18 +155,19 @@ func (b Bot) Run() (string, error) {
 	// Start polling Telegram for updates.
 	updates := b.bot.GetUpdatesChan(updateConfig)
 
-	tm := time.NewTicker(minPeriodicInterval)
-	defer tm.Stop()
+	periodic := time.NewTicker(minPeriodicInterval)
+	defer periodic.Stop()
 
 	// Let's go through each update that we're getting from Telegram.
 	for {
 		select {
 		case s := <-b.signalChan:
 			if s == os.Interrupt {
-				return fmt.Sprintf("%s was interruped by system signal", b.runtime), nil
+				return fmt.Sprintf("%s was interrupted by system signal", b.runtime), nil
 			}
+
 			return fmt.Sprintf("%s was killed", b.runtime), nil
-		case <-tm.C:
+		case <-periodic.C:
 			b.processPeriodicTasks(chatIDs)
 
 		case update := <-updates:
@@ -195,7 +202,7 @@ func (b Bot) Run() (string, error) {
 }
 
 func (b *Bot) processPeriodicTasks(chatIDs []int64) {
-	b.periodicTaskCycle += 1
+	b.periodicTaskCycle++
 	for _, h := range b.periodicTasks {
 		if b.periodicTaskCycle/h.interval == 0 {
 			notificationMessageWrapper(h.intro, h.fn, b.bot, chatIDs)
@@ -203,7 +210,7 @@ func (b *Bot) processPeriodicTasks(chatIDs []int64) {
 	}
 }
 
-// retries operation and watches for interrupt. Never return an error on success
+// retries operation and watches for interrupt. Never return an error on success.
 func retryTillInterrupt(f func() error, sighandler <-chan os.Signal, runtime string) error {
 	for {
 		if err := f(); err != nil {
@@ -211,8 +218,9 @@ func retryTillInterrupt(f func() error, sighandler <-chan os.Signal, runtime str
 			select {
 			case s := <-sighandler:
 				if s == os.Interrupt {
-					return interruptedErr{fmt.Sprintf("%s was interruped by system signal", runtime)}
+					return interruptedErr{fmt.Sprintf("%s was interrupted by system signal", runtime)}
 				}
+
 				return interruptedErr{fmt.Sprintf("%s was killed", runtime)}
 			case <-time.After(retryInterval):
 				continue

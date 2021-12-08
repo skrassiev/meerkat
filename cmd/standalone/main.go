@@ -5,5 +5,5 @@ import (
 )
 
 func main() {
-	bootstrap.Main("process")
+	_, _ = bootstrap.Main("process")
 }

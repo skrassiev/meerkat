@@ -31,12 +31,12 @@ Restart=on-failure
 WantedBy=multi-user.target
 `
 
-//    dependencies that are NOT required by the service, but might be used
+//    dependencies that are NOT required by the service, but might be used.
 var dependencies = []string{"network.target"}
 
-var stdlog, errlog *log.Logger
+var errlog *log.Logger
 
-// Service has embedded daemon
+// Service has embedded daemon.
 type Service struct {
 	daemon.Daemon
 }
@@ -45,7 +45,7 @@ func usage() string {
 	return fmt.Sprintf("Usage: %s install | remove | start | stop | status", name)
 }
 
-// Manage by daemon commands or run the daemon
+// Manage by daemon commands or run the daemon.
 func (service *Service) Manage() (string, error) {
 
 	// if received any kind of command, do it
@@ -53,7 +53,7 @@ func (service *Service) Manage() (string, error) {
 		command := os.Args[1]
 		switch command {
 		case "install":
-			service.SetTemplate(systemDConfig)
+			_ = service.SetTemplate(systemDConfig)
 			return service.Install()
 		case "remove":
 			return service.Remove()
@@ -73,7 +73,7 @@ func (service *Service) Manage() (string, error) {
 }
 
 func init() {
-	stdlog = log.New(os.Stdout, "", log.Ldate|log.Ltime)
+	// stdlog = log.New(os.Stdout, "", log.Ldate|log.Ltime)
 	errlog = log.New(os.Stderr, "", log.Ldate|log.Ltime)
 }
 
