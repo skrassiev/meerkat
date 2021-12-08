@@ -69,13 +69,13 @@ func TestPublicIP_404(t *testing.T) {
 func TestPublicIP_403(t *testing.T) {
 	origURL := publicIPResolverURL
 	defer func() { publicIPResolverURL = origURL }()
-	publicIPResolverURL = "https:// www.google.com/search?q=vim"
+	publicIPResolverURL = "https://www.google.com/search?q=vim"
 	assert.Equal(t, "", PublicIP())
 }
 
 func TestPublicIP_BigBody(t *testing.T) {
 	origURL := publicIPResolverURL
 	defer func() { publicIPResolverURL = origURL }()
-	publicIPResolverURL = "https:// en.wikipedia.org/wiki/Vim_(text_editor)"
+	publicIPResolverURL = "https://en.wikipedia.org/wiki/Vim_(text_editor)"
 	assert.Equal(t, "", PublicIP())
 }

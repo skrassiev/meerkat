@@ -12,7 +12,7 @@ import (
 
 var (
 	publicIP             net.IP
-	publicIPResolverURLs = []string{"http:// ifconfig.io", "https://api.ipify.org"}
+	publicIPResolverURLs = []string{"http://ifconfig.io", "https://api.ipify.org"}
 	publicIPResolverURL  = publicIPResolverURLs[1]
 )
 

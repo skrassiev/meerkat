@@ -12,7 +12,7 @@ import (
 var testDataDir = func() string {
 	_, err := os.Stat("testdata")
 	if os.IsNotExist(err) {
-		return "./testdata"
+		return "../testdata"
 	}
 	return "testdata"
 }()
