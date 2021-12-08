@@ -1,4 +1,4 @@
-package sensor
+package feed
 
 import (
 	"bufio"
@@ -14,6 +14,7 @@ import (
 	"io"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"github.com/skrassiev/gsnowmelt_bot/telega"
 )
 
 const (
@@ -30,17 +31,17 @@ var (
 )
 
 // HandlerCommandTemp reads temp from a sensor and reponds in a telegram message
-func HandleCommandlTemp(cmd *tgbotapi.Message, _ *tgbotapi.BotAPI) (response tgbotapi.MessageConfig) {
+func HandleCommandlTemp(cmd *tgbotapi.Message, _ *tgbotapi.BotAPI) (response telega.ChattableCloser, _ error) {
 	v, _ := getTemperatureReadingWithRetries(sensorDevicePath, 10)
 	// Now that we know we've gotten a new message, we can construct a
 	// reply! We'll take the Chat ID and Text from the incoming message
 	// and use it to create a new message.
-	response = tgbotapi.NewMessage(cmd.Chat.ID, fmt.Sprintf("%v ℃ 🌡 on %v", float32(v)/1000.0, lastTime.Format("Jan 2 15:04:05")))
+	r := tgbotapi.NewMessage(cmd.Chat.ID, fmt.Sprintf("%v ℃ 🌡 on %v", float32(v)/1000.0, lastTime.Format("Jan 2 15:04:05")))
 	// We'll also say that this message is a reply to the previous message.
 	// For any other specifications than Chat ID or Text, you'll need to
 	// set fields on the `MessageConfig`.
 	// msg.ReplyToMessageID = update.Message.MessageID
-	return
+	return telega.ChattableText{r}, nil
 }
 
 func scanTemperatureReading(reader io.Reader) (int32, error) {

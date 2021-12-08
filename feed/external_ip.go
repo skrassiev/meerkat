@@ -1,4 +1,4 @@
-package sensor
+package feed
 
 import (
 	"fmt"
@@ -11,8 +11,9 @@ import (
 )
 
 var (
-	publicIP            net.IP
-	publicIPResolverURL = "http://ifconfig.io"
+	publicIP             net.IP
+	publicIPResolverURLs = []string{"http://ifconfig.io", "https://api.ipify.org"}
+	publicIPResolverURL  = publicIPResolverURLs[1]
 )
 
 func onError(msg string, arg interface{}) string {
@@ -20,8 +21,8 @@ func onError(msg string, arg interface{}) string {
 	return ""
 }
 
-//GetPublicIP returns current public IP of the system as a string. Returns emptry string if not changed or could not be determined
-func GetPublicIP() (ip_address string) {
+//PublicIP returns current public IP of the system as a string. Returns emptry string if not changed or could not be determined
+func PublicIP() (ip_address string) {
 	req, err := http.NewRequest(http.MethodGet, publicIPResolverURL, nil)
 	if err != nil {
 		return onError("error getting public IP", err)
