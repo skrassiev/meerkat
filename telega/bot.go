@@ -2,6 +2,7 @@ package telega
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"math"
 	"net/http"
@@ -14,7 +15,22 @@ import (
 )
 
 // handler for a single command
-type CommandHandler func(cmd *tgbotapi.Message, bot *tgbotapi.BotAPI) (response tgbotapi.MessageConfig)
+
+// ChattableCloser is a chattable message, which is closed after use
+type ChattableCloser interface {
+	tgbotapi.Chattable
+	io.Closer
+}
+
+type ChattableText struct {
+	tgbotapi.Chattable
+}
+
+func (c ChattableText) Close() error {
+	return nil
+}
+
+type CommandHandler func(cmd *tgbotapi.Message, bot *tgbotapi.BotAPI) (response ChattableCloser, err error)
 type TaskFunction func() string
 
 // define periodic functions
@@ -164,7 +180,11 @@ func (b Bot) Run() (string, error) {
 				// Okay, we're sending our message off! We don't care about the message
 				// we just sent, so we'll discard it.
 				if err := retryTillInterrupt(func() error {
-					_, err := b.bot.Send(h(update.Message, b.bot))
+					outmsg, err := h(update.Message, b.bot)
+					if err == nil {
+						defer outmsg.Close()
+						_, err = b.bot.Send(outmsg)
+					}
 					return err
 				}, b.signalChan, b.runtime); err != nil {
 					return err.Error(), nil

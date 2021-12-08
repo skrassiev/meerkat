@@ -1,4 +1,4 @@
-package sensor
+package feed
 
 import (
 	"os"

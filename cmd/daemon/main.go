@@ -4,10 +4,8 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"os/signal"
-	"syscall"
 
-	"github.com/skrassiev/gsnowmelt_bot/sensor"
+	"github.com/skrassiev/gsnowmelt_bot/bootstrap"
 	"github.com/takama/daemon"
 )
 
@@ -71,15 +69,7 @@ func (service *Service) Manage() (string, error) {
 	}
 
 	// Do something, call your goroutines, etc
-
-	// Set up channel on which to send signal notifications.
-	// We must use a buffered channel or risk missing the signal
-	// if we're not ready to receive when the signal is sent.
-	interrupt := make(chan os.Signal, 1)
-	signal.Notify(interrupt, os.Interrupt, os.Kill, syscall.SIGTERM)
-
-	// never happen, but need to complete code
-	return sensor.ServeBotAPI(interrupt, "daemon")
+	return bootstrap.Main("daemon")
 }
 
 func init() {
