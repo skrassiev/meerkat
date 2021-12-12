@@ -2,6 +2,8 @@
 
 ## Block remote service on linux
 
+To test failing remote service, such as api.ipify.org, block all IPs of that FQDN with:
+
 ```bash
 sudo iptables -t filter -A OUTPUT -p tcp -d 104.21.192.0/24 -j DROP
 go test -v

@@ -2,6 +2,7 @@ package feed
 
 import (
 	"bufio"
+	"context"
 	"errors"
 	"fmt"
 	"log"
@@ -30,8 +31,8 @@ var (
 )
 
 // HandlerCommandTemp reads temp from a sensor and reponds in a telegram message.
-func HandleCommandlTemp(cmd *tgbotapi.Message, _ *tgbotapi.BotAPI) (response telega.ChattableCloser, _ error) {
-	v, _ := getTemperatureReadingWithRetries(sensorDevicePath, 10)
+func HandleCommandlTemp(ctx context.Context, cmd *tgbotapi.Message, _ *tgbotapi.BotAPI) (response telega.ChattableCloser, _ error) {
+	v, _ := getTemperatureReadingWithRetries(ctx, sensorDevicePath, 10)
 	// Now that we know we've gotten a new message, we can construct a
 	// reply! We'll take the Chat ID and Text from the incoming message
 	// and use it to create a new message.
@@ -80,7 +81,7 @@ func getTemperatureReading(fpath string) (int32, error) {
 	return scanTemperatureReading(f)
 }
 
-func getTemperatureReadingWithRetries(fpath string, retries int) (temperature int32, err error) {
+func getTemperatureReadingWithRetries(ctx context.Context, fpath string, retries int) (temperature int32, err error) {
 	// do not allow more frequent polls
 	if time.Since(lastTime) < minRereshInterval {
 		return atomic.LoadInt32(&lastTemp), nil
@@ -99,7 +100,11 @@ func getTemperatureReadingWithRetries(fpath string, retries int) (temperature in
 				break
 			}
 		}
-		time.Sleep(100 * time.Millisecond)
+		select {
+		case <-time.After(100 * time.Millisecond):
+		case <-ctx.Done():
+			retries = -1
+		}
 	}
 
 	if err == nil {

@@ -1,6 +1,7 @@
 package telega
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"log"
@@ -30,8 +31,8 @@ func (c ChattableText) Close() error {
 	return nil
 }
 
-type CommandHandler func(cmd *tgbotapi.Message, bot *tgbotapi.BotAPI) (response ChattableCloser, err error)
-type TaskFunction func() string
+type CommandHandler func(ctx context.Context, cmd *tgbotapi.Message, bot *tgbotapi.BotAPI) (response ChattableCloser, err error)
+type TaskFunction func(ctx context.Context) string
 
 // define periodic functions.
 type periodicTaskDef struct {
@@ -57,33 +58,33 @@ func (e interruptedErr) Error() string {
 // Bot is a highger-level wrapper over tgbotpi. Allow adding service handlers and periodic functions.
 type Bot struct {
 	bot               *tgbotapi.BotAPI
-	signalChan        <-chan os.Signal
 	runtime           string
 	cmdHandlers       map[string]CommandHandler
 	periodicTasks     []periodicTaskDef
 	periodicTaskCycle uint32
+	ctx               context.Context
 }
 
 // Init initializes telegram bot.
-func (b *Bot) Init(signals <-chan os.Signal, runtime string) error {
+func (b *Bot) Init(ctx context.Context, runtime string) error {
 	var err error
 
 	log.Println("connecting bot client to API")
 
 	c := &http.Client{Timeout: httpTimeout}
-	err = retryTillInterrupt(func() error {
+	err = retryTillInterrupt(ctx, func(_ context.Context) error {
 		b.bot, err = tgbotapi.NewBotAPIWithClient(os.Getenv("TELEGRAM_APITOKEN"), c)
 
 		return err
-	}, signals, runtime)
+	}, runtime)
 
 	if err != nil {
 		return err
 	}
 
-	b.signalChan = signals
 	b.runtime = runtime
 	b.bot.Debug = true
+	b.ctx = ctx
 
 	return nil
 }
@@ -161,12 +162,8 @@ func (b Bot) Run() (string, error) {
 	// Let's go through each update that we're getting from Telegram.
 	for {
 		select {
-		case s := <-b.signalChan:
-			if s == os.Interrupt {
-				return fmt.Sprintf("%s was interrupted by system signal", b.runtime), nil
-			}
-
-			return fmt.Sprintf("%s was killed", b.runtime), nil
+		case <-b.ctx.Done():
+			return fmt.Sprintf("%s context cancelled", b.runtime), nil
 		case <-periodic.C:
 			b.processPeriodicTasks(chatIDs)
 
@@ -183,17 +180,17 @@ func (b Bot) Run() (string, error) {
 				continue
 			}
 
-			if h, exists := b.cmdHandlers[update.Message.Text]; exists {
+			if h, exists := b.cmdHandlers[strings.Split(update.Message.Text, "@")[0]]; exists {
 				// Okay, we're sending our message off! We don't care about the message
 				// we just sent, so we'll discard it.
-				if err := retryTillInterrupt(func() error {
-					outmsg, err := h(update.Message, b.bot)
+				if err := retryTillInterrupt(b.ctx, func(ctx context.Context) error {
+					outmsg, err := h(ctx, update.Message, b.bot)
 					if err == nil {
 						defer outmsg.Close()
 						_, err = b.bot.Send(outmsg)
 					}
 					return err
-				}, b.signalChan, b.runtime); err != nil {
+				}, b.runtime); err != nil {
 					return err.Error(), nil
 				}
 			}
@@ -205,23 +202,19 @@ func (b *Bot) processPeriodicTasks(chatIDs []int64) {
 	b.periodicTaskCycle++
 	for _, h := range b.periodicTasks {
 		if b.periodicTaskCycle/h.interval == 0 {
-			notificationMessageWrapper(h.intro, h.fn, b.bot, chatIDs)
+			notificationMessageWrapper(b.ctx, h.intro, h.fn, b.bot, chatIDs)
 		}
 	}
 }
 
 // retries operation and watches for interrupt. Never return an error on success.
-func retryTillInterrupt(f func() error, sighandler <-chan os.Signal, runtime string) error {
+func retryTillInterrupt(ctx context.Context, f func(ctx context.Context) error, runtime string) error {
 	for {
-		if err := f(); err != nil {
+		if err := f(ctx); err != nil {
 			log.Println("Telegram API failiure", err)
 			select {
-			case s := <-sighandler:
-				if s == os.Interrupt {
-					return interruptedErr{fmt.Sprintf("%s was interrupted by system signal", runtime)}
-				}
-
-				return interruptedErr{fmt.Sprintf("%s was killed", runtime)}
+			case <-ctx.Done():
+				return interruptedErr{fmt.Sprintf("%s was cancelled", runtime)}
 			case <-time.After(retryInterval):
 				continue
 			}
@@ -231,8 +224,8 @@ func retryTillInterrupt(f func() error, sighandler <-chan os.Signal, runtime str
 	return nil
 }
 
-func notificationMessageWrapper(msgInfo string, messageFunc TaskFunction, bot *tgbotapi.BotAPI, chatIDs []int64) {
-	if msgText := messageFunc(); len(msgText) != 0 {
+func notificationMessageWrapper(ctx context.Context, msgInfo string, messageFunc TaskFunction, bot *tgbotapi.BotAPI, chatIDs []int64) {
+	if msgText := messageFunc(ctx); len(msgText) != 0 {
 		for _, v := range chatIDs {
 			msg := tgbotapi.NewMessage(v, fmt.Sprintf("%s %s", msgInfo, msgText))
 			if _, err := bot.Send(msg); err != nil {

@@ -1,6 +1,7 @@
 package feed
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"log"
@@ -22,8 +23,8 @@ func onError(msg string, arg interface{}) string {
 }
 
 // PublicIP returns current public IP of the system as a string. Returns emptry string if not changed or could not be determined.
-func PublicIP() (ipAddress string) {
-	req, err := http.NewRequest(http.MethodGet, publicIPResolverURL, nil)
+func PublicIP(ctx context.Context) (ipAddress string) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, publicIPResolverURL, nil)
 	if err != nil {
 		return onError("error getting public IP", err)
 	}

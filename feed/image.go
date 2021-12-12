@@ -1,6 +1,7 @@
 package feed
 
 import (
+	"context"
 	"io"
 	"net/http"
 
@@ -17,8 +18,12 @@ func (m chattableFileUploader) Close() error {
 	return m.Closer.Close()
 }
 
-func getRemotePictureAsBytes(url string) (body io.ReadCloser, bodyLen int64, err error) {
-	resp, err := http.Get(url)
+func getRemotePictureAsBytes(ctx context.Context, url string) (body io.ReadCloser, bodyLen int64, err error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, 0, err
+	}
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, 0, err
 	} else if resp != nil {
@@ -30,8 +35,8 @@ func getRemotePictureAsBytes(url string) (body io.ReadCloser, bodyLen int64, err
 
 // GetPictureByURL serves an image from a remote URL.
 func GetPictureByURL(fileURL string) telega.CommandHandler {
-	return func(cmd *tgbotapi.Message, _ *tgbotapi.BotAPI) (response telega.ChattableCloser, _ error) {
-		body, len, err := getRemotePictureAsBytes(fileURL)
+	return func(ctx context.Context, cmd *tgbotapi.Message, _ *tgbotapi.BotAPI) (response telega.ChattableCloser, _ error) {
+		body, len, err := getRemotePictureAsBytes(ctx, fileURL)
 		if err != nil {
 			return nil, err
 		}

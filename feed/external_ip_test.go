@@ -1,6 +1,7 @@
 package feed
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"log"
@@ -46,14 +47,29 @@ func TestPublicIP_OK(t *testing.T) {
 			*assertPublicIP = os.Getenv("TEST_PUBLIC_IP")
 		}
 
-		assert.Equal(t, *assertPublicIP, PublicIP())
-		assert.Equal(t, "", PublicIP())
+		assert.Equal(t, *assertPublicIP, PublicIP(context.Background()))
+		assert.Equal(t, "", PublicIP(context.Background()))
 	}
 }
 
+func TestPublicIP_ConnectFailureCancellableWithDeadline(t *testing.T) {
+	if noConn {
+		ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(1*time.Second))
+		assert.Equal(t, "", PublicIP(ctx))
+		cancel()
+	}
+}
+
+func TestPublicIP_ConnectFailureCancellable(t *testing.T) {
+	if noConn {
+		ctx, cancel := context.WithCancel(context.Background())
+		go func() { time.Sleep(2 * time.Second); cancel() }()
+		assert.Equal(t, "", PublicIP(ctx))
+	}
+}
 func TestPublicIP_ConnectFailure(t *testing.T) {
 	if noConn {
-		assert.Equal(t, "", PublicIP())
+		assert.Equal(t, "", PublicIP(context.Background()))
 	}
 }
 
@@ -62,7 +78,7 @@ func TestPublicIP_404(t *testing.T) {
 		origURL := publicIPResolverURL
 		defer func() { publicIPResolverURL = origURL }()
 		publicIPResolverURL = publicIPResolverURLs[0] + "/safdaf/sgsdg/sgd"
-		assert.Equal(t, "", PublicIP())
+		assert.Equal(t, "", PublicIP(context.Background()))
 	}
 }
 
@@ -70,12 +86,12 @@ func TestPublicIP_403(t *testing.T) {
 	origURL := publicIPResolverURL
 	defer func() { publicIPResolverURL = origURL }()
 	publicIPResolverURL = "https://www.google.com/search?q=vim"
-	assert.Equal(t, "", PublicIP())
+	assert.Equal(t, "", PublicIP(context.Background()))
 }
 
 func TestPublicIP_BigBody(t *testing.T) {
 	origURL := publicIPResolverURL
 	defer func() { publicIPResolverURL = origURL }()
 	publicIPResolverURL = "https://en.wikipedia.org/wiki/Vim_(text_editor)"
-	assert.Equal(t, "", PublicIP())
+	assert.Equal(t, "", PublicIP(context.Background()))
 }

@@ -1,6 +1,7 @@
 package feed
 
 import (
+	"context"
 	"os"
 	"strings"
 	"testing"
@@ -44,22 +45,24 @@ func Test003_tempParseFile(t *testing.T) {
 }
 
 func Test004_tempParseFilePersistent(t *testing.T) {
-	v, err := getTemperatureReadingWithRetries(testDataDir+sensorDevicePath, 11)
+	ctx := context.Background()
+
+	v, err := getTemperatureReadingWithRetries(ctx, testDataDir+sensorDevicePath, 11)
 	assert.NoError(t, err)
 	assert.Equal(t, int32(29812), v)
 
-	v, err = getTemperatureReadingWithRetries(testDataDir+sensorDevicePath, 1000)
+	v, err = getTemperatureReadingWithRetries(ctx, testDataDir+sensorDevicePath, 1000)
 	assert.NoError(t, err)
 	assert.Equal(t, int32(29812), v)
 
 	lastTime = time.Now().Add(-minRereshInterval)
-	v, err = getTemperatureReadingWithRetries(testDataDir+sensorDevicePath, -1)
+	v, err = getTemperatureReadingWithRetries(ctx, testDataDir+sensorDevicePath, -1)
 	assert.NoError(t, err)
 	assert.Equal(t, int32(29812), v)
 
 	lastTime = time.Now().Add(-minRereshInterval)
 	lastTemp = errTemp
-	v, err = getTemperatureReadingWithRetries(testDataDir+sensorDevicePath, 0)
+	v, err = getTemperatureReadingWithRetries(ctx, testDataDir+sensorDevicePath, 0)
 	assert.NoError(t, err)
 	assert.Equal(t, int32(29812), v)
 }
