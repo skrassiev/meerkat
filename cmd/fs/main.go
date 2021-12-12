@@ -35,6 +35,9 @@ func main() {
 	}()
 
 	err = watcher.Add("./foo")
+	if err != nil {
+		log.Fatal(err)
+	}
 	err = watcher.Add("./foo/street")
 	if err != nil {
 		log.Fatal(err)

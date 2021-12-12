@@ -27,6 +27,7 @@ func Main(runtime string) (status string, err error) {
 	var bot telega.Bot
 	if err = bot.Init(ctx, runtime); err != nil {
 		log.Println(err)
+		cancel()
 		return "failed to init", err
 	}
 
