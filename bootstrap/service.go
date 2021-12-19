@@ -18,10 +18,6 @@ import (
 // Main adds standard handlers to the telega bot.
 func Main(runtime string) (status string, err error) {
 
-	// process management
-	interrupt := make(chan os.Signal, 1)
-	signal.Notify(interrupt, os.Interrupt, syscall.SIGTERM)
-
 	ctx, cancel := context.WithCancel(context.Background())
 
 	var bot telega.Bot
@@ -57,6 +53,10 @@ func Main(runtime string) (status string, err error) {
 		log.Println("wg finished")
 		done <- struct{}{}
 	}()
+
+	// process management
+	interrupt := make(chan os.Signal, 1)
+	signal.Notify(interrupt, os.Interrupt, syscall.SIGTERM)
 
 	for {
 		select {
