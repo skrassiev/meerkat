@@ -19,7 +19,7 @@ import (
 )
 
 const (
-	sensorDevicePath        = "/sys/bus/w1/devices/28-3c01d607cfc6/w1_slave"
+	sensorDevicePath        = "/sys/bus/w1/devices/28-3c01d607ca0a/w1_slave"
 	errTemp           int32 = -1000
 	maxRetries              = 10
 	minRereshInterval       = 5 * time.Second
@@ -36,7 +36,7 @@ func HandleCommandlTemp(ctx context.Context, cmd *tgbotapi.Message, _ *tgbotapi.
 	// Now that we know we've gotten a new message, we can construct a
 	// reply! We'll take the Chat ID and Text from the incoming message
 	// and use it to create a new message.
-	r := tgbotapi.NewMessage(cmd.Chat.ID, fmt.Sprintf("%v ℃ 🌡 on %v", float32(v)/1000.0, lastTime.Format("Jan 2 15:04:05")))
+	r := tgbotapi.NewMessage(cmd.Chat.ID, fmt.Sprintf("%.1f ℃ 🌡 on %v", float32(v)/1000.0, lastTime.Format("Jan 2 15:04:05")))
 	// We'll also say that this message is a reply to the previous message.
 	// For any other specifications than Chat ID or Text, you'll need to
 	// set fields on the `MessageConfig`.
@@ -58,6 +58,7 @@ func scanTemperatureReading(reader io.Reader) (int32, error) {
 						log.Println(err, st[1])
 						return errTemp, err
 					}
+					log.Println("scanned", ret, "temp, normalized", int32(ret&0x7fffffff))
 					return int32(ret & 0x7fffffff), nil
 				}
 				log.Println("could not parse", ts)
