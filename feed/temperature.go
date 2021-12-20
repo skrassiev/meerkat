@@ -58,8 +58,8 @@ func scanTemperatureReading(reader io.Reader) (int32, error) {
 						log.Println(err, st[1])
 						return errTemp, err
 					}
-					log.Println("scanned", ret, "temp, normalized", int32(ret&0x7fffffff))
-					return int32(ret & 0x7fffffff), nil
+					log.Println("scanned temp", ret)
+					return int32(ret), nil
 				}
 				log.Println("could not parse", ts)
 				return errTemp, fmt.Errorf("could not parse %v", ts)
