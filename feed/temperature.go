@@ -53,13 +53,13 @@ func scanTemperatureReading(reader io.Reader) (int32, error) {
 			if strings.HasPrefix(ts, "t=") {
 				st := strings.Split(ts, "=")
 				if len(st) == 2 {
-					ret, err := strconv.Atoi(st[1])
+					ret, err := strconv.ParseInt(st[1], 10, 32)
 					if err != nil {
 						log.Println(err, st[1])
 						return errTemp, err
 					}
-					log.Println("scanned", ret, "temp, normalized", int32(ret&0x7fffffff))
-					return int32(ret & 0x7fffffff), nil
+					log.Println("scanned temp", ret)
+					return int32(ret), nil
 				}
 				log.Println("could not parse", ts)
 				return errTemp, fmt.Errorf("could not parse %v", ts)
