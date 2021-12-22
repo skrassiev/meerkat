@@ -198,7 +198,8 @@ func (b Bot) Run() (string, error) {
 			}
 
 			if _, found := allowedChatIDs[update.Message.Chat.ID]; !found {
-				log.Println("received", update.Message.Text[:10], "message from unknown chat")
+				pos := int(math.Min(10, float64(len(update.Message.Text))))
+				log.Println("received", update.Message.Text[:pos], "message from unknown chat")
 				continue
 			}
 
