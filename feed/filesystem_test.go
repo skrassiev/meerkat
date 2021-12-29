@@ -3,10 +3,11 @@ package feed
 import (
 	"context"
 	"io/fs"
-	"os"
+	"log"
 	"os/exec"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"testing"
 	"time"
@@ -19,7 +20,7 @@ import (
 
 const (
 	fsnotifyNoEntError = "can't remove non-existent inotify watch for"
-	dirStruct          = "/{aaa,aab,aac,aad,aae,aaf,aag}/{baa,bab,bac,bad,bae,baf,bag}/{caa,cab,cac,cad,cae,caf,cag}"
+	dirStruct          = "/{aaa,aab,aac,aad,aae,aaf,aag}/{baa,bab,bac,bad,bae,baf,bag}/{caa,cab,cac,cad,cae,caf,cag}/{foo,bar,baz}i/{alpha,beta,gamma,theta}"
 )
 
 var (
@@ -33,6 +34,7 @@ var (
 		for i := range ds {
 			ret = append(ret, int32(len(strings.Split(ds[i], ","))))
 		}
+		log.Printf("%+v\n", ret)
 		return ret
 	}()
 )
@@ -48,7 +50,7 @@ func mulArray(arr []int32) int32 {
 		ret *= arr[i]
 	}
 
-	return ret + mulArray(arr[1:])
+	return ret + mulArray(arr[:len(arr)-1])
 }
 
 func cleanup(fpath string) {
@@ -82,6 +84,26 @@ func TestFS_fsnotify(t *testing.T) {
 }
 
 func TestFS_MonitorDirRecursively(t *testing.T) {
+
+	var (
+		fsMap            [2]sync.Map
+		monitoredCounter [2]int32
+		fsAdd1           = func(fpath string, watcher *fsnotify.Watcher) (exists bool, err error) {
+			if _, loaded := fsMap[0].LoadOrStore(fpath, struct{}{}); !loaded {
+				atomic.AddInt32(&monitoredCounter[0], 1)
+				return false, watcher.Add(fpath)
+			}
+			return true, nil
+		}
+		fsAdd2 = func(fpath string, watcher *fsnotify.Watcher) (exists bool, err error) {
+			if _, loaded := fsMap[1].LoadOrStore(fpath, struct{}{}); !loaded {
+				atomic.AddInt32(&monitoredCounter[1], 1)
+				return false, watcher.Add(fpath)
+			}
+			return true, nil
+		}
+	)
+
 	fsroot := "fsroot"
 	var wg sync.WaitGroup
 
@@ -90,40 +112,25 @@ func TestFS_MonitorDirRecursively(t *testing.T) {
 	cleanup(fsroot)
 
 	require.NoError(t, exec.Command("/bin/bash", "-c", "mkdir -p "+fsroot).Run())
-	var mon1 int32
-	bgFunc1 := MonitorDirectoryTree(fsroot, true, &mon1)
+	bgFunc1 := monitorDirectoryTree(fsroot, fsAdd1)
 	ctx, cancel := context.WithCancel(context.Background())
 	monitoringChannel := make(chan telega.ChattableCloser)
 
 	wg.Add(1)
 	go func() { bgFunc1(ctx, monitoringChannel); wg.Done() }()
 
-	require.NoError(t, exec.Command("/bin/bash", "-c", "mkdir -p "+fsroot+"/{aaa,aab,aac,aad,aae,aaf,aag}/{baa,bab,bac,bad,bae,baf,bag}/{caa,cab,cac,cad,cae,caf,cag}").Run())
+	require.NoError(t, exec.Command("/bin/bash", "-c", "mkdir -p "+fsroot+dirStruct).Run())
 
-	var mon2 int32
-	bgFunc2 := MonitorDirectoryTree(fsroot, true, &mon2)
+	bgFunc2 := monitorDirectoryTree(fsroot, fsAdd2)
 
 	wg.Add(1)
 	go func() { bgFunc2(ctx, monitoringChannel); wg.Done() }()
 
 	time.Sleep(500 * time.Millisecond)
-	assert.Equal(t, mulArray(dirStructCount)+1, mon2)
-	assert.Equal(t, mulArray(dirStructCount)+1, mon1)
-
-	rootFS := os.DirFS(fsroot)
-	totalDirs := int32(0)
-	fs.WalkDir(rootFS, ".", walkFunction(fsroot, func(fpath string) error {
-		//fmt.Println(fpath)
-		totalDirs++
-		return nil
-	}))
-
-	assert.Equal(t, mulArray(dirStructCount)+1, totalDirs)
+	assert.Equal(t, mulArray(dirStructCount)+1, monitoredCounter[0])
+	assert.Equal(t, mulArray(dirStructCount)+1, monitoredCounter[1])
 
 	cleanup(fsroot)
-	time.Sleep(500 * time.Millisecond)
-	assert.Equal(t, 0, mon2)
-	assert.Equal(t, 0, mon1)
 
 	cancel()
 	wg.Wait()
@@ -131,33 +138,80 @@ func TestFS_MonitorDirRecursively(t *testing.T) {
 }
 
 func TestFS_MonitorDirConcurrently(t *testing.T) {
+
+	var (
+		fsMap            sync.Map
+		monitoredCounter int32
+		fsw              *fsnotify.Watcher
+		fsAdd            = func(fpath string, watcher *fsnotify.Watcher) (exists bool, err error) {
+			fsw = watcher
+			if _, loaded := fsMap.LoadOrStore(fpath, struct{}{}); !loaded {
+				atomic.AddInt32(&monitoredCounter, 1)
+				return false, watcher.Add(fpath)
+			}
+			return true, nil
+		}
+	)
+
 	fsroot := "fsroot"
 	var wg sync.WaitGroup
 
-	//defer cleanup(fsroot)
+	defer cleanup(fsroot)
 
-	//cleanup(fsroot)
+	cleanup(fsroot)
 
 	require.NoError(t, exec.Command("/bin/bash", "-c", "mkdir -p "+fsroot).Run())
-	var mon1 int32
-	bgFunc1 := MonitorDirectoryTree(fsroot, true, &mon1)
+	bgFunc1 := monitorDirectoryTree(fsroot, fsAdd)
 	ctx, cancel := context.WithCancel(context.Background())
 	monitoringChannel := make(chan telega.ChattableCloser)
 
 	wg.Add(1)
 	go func() { bgFunc1(ctx, monitoringChannel); wg.Done() }()
-	time.Sleep(2 * time.Second)
 
-	require.NoError(t, exec.Command("/bin/bash", "-c", "mkdir -p "+fsroot+"/{aaa,aab,aac,aad,aae,aaf,aag}/{baa,bab,bac,bad,bae,baf,bag}/{caa,cab,cac,cad,cae,caf,cag}").Run())
+	err := exec.Command("/bin/bash", "-c", "mkdir -p "+fsroot+dirStruct).Run()
+	require.NoError(t, err)
 
-	time.Sleep(1500 * time.Millisecond)
-	assert.Equal(t, mulArray(dirStructCount)+1, mon1)
+	time.Sleep(500 * time.Millisecond)
+	assert.Equal(t, mulArray(dirStructCount)+1, monitoredCounter)
 
 	assert.NoError(t, fsw.Remove("fsroot/aac/bac"))
 
-	//cleanup(fsroot)
+	cleanup(fsroot)
+	time.Sleep(100 * time.Millisecond)
+
+	cancel()
+	wg.Wait()
+}
+
+func TestFS_StockMonitorDir(t *testing.T) {
+	var (
+		fsAdd = func(fpath string, watcher *fsnotify.Watcher) (exists bool, err error) {
+			err = watcher.Add(fpath)
+			assert.NoError(t, err, "Cannot add watch for directory"+fpath)
+			return false, err
+		}
+	)
+	fsroot := "fsroot"
+	var wg sync.WaitGroup
+
+	defer cleanup(fsroot)
+	cleanup(fsroot)
+
+	require.NoError(t, exec.Command("/bin/bash", "-c", "mkdir -p "+fsroot).Run())
+	bgFunc1 := monitorDirectoryTree(fsroot, fsAdd)
+	ctx, cancel := context.WithCancel(context.Background())
+	monitoringChannel := make(chan telega.ChattableCloser)
+
+	wg.Add(1)
+	go func() { bgFunc1(ctx, monitoringChannel); wg.Done() }()
+
+	err := exec.Command("/bin/bash", "-c", "mkdir -p "+fsroot+dirStruct).Run()
+	require.NoError(t, err)
+
 	time.Sleep(500 * time.Millisecond)
-	assert.Equal(t, 0, mon1)
+
+	cleanup(fsroot)
+	time.Sleep(100 * time.Millisecond)
 
 	cancel()
 	wg.Wait()
