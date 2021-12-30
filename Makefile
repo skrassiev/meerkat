@@ -4,4 +4,5 @@ all:
 rpi:
 	GOOS=linux GOARCH=arm go build cmd/standalone/main.go
 
-
+test:
+	go test -v ./... -args --public-ip=$$(curl ifconfig.io)
