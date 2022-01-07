@@ -10,6 +10,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -27,12 +28,19 @@ type ChattableText struct {
 	tgbotapi.Chattable
 }
 
+// Close is a noop function
 func (c ChattableText) Close() error {
 	return nil
 }
 
+// CommandHandler is a function, which can handle a specific bot command
 type CommandHandler func(ctx context.Context, cmd *tgbotapi.Message, bot *tgbotapi.BotAPI) (response ChattableCloser, err error)
+
+// TaskFunction is a function, which is executed by bot periodically
 type TaskFunction func(ctx context.Context) string
+
+// BackgroundFunction runs in a background in a goroutine and sends back events as those get created
+type BackgroundFunction func(ctx context.Context, events chan<- ChattableCloser)
 
 // define periodic functions.
 type periodicTaskDef struct {
@@ -57,12 +65,14 @@ func (e interruptedErr) Error() string {
 
 // Bot is a highger-level wrapper over tgbotpi. Allow adding service handlers and periodic functions.
 type Bot struct {
-	bot               *tgbotapi.BotAPI
-	runtime           string
-	cmdHandlers       map[string]CommandHandler
-	periodicTasks     []periodicTaskDef
-	periodicTaskCycle uint32
-	ctx               context.Context
+	bot                 *tgbotapi.BotAPI
+	runtime             string
+	cmdHandlers         map[string]CommandHandler
+	periodicTasks       []periodicTaskDef
+	backgroundFunctions []BackgroundFunction
+	periodicTaskCycle   uint32
+	ctx                 context.Context
+	backgroundEvents    chan ChattableCloser
 }
 
 // Init initializes telegram bot.
@@ -85,6 +95,7 @@ func (b *Bot) Init(ctx context.Context, runtime string) error {
 	b.runtime = runtime
 	b.bot.Debug = true
 	b.ctx = ctx
+	b.backgroundEvents = make(chan ChattableCloser, 10)
 
 	return nil
 }
@@ -156,6 +167,17 @@ func (b Bot) Run() (string, error) {
 	// Start polling Telegram for updates.
 	updates := b.bot.GetUpdatesChan(updateConfig)
 
+	// launch background jobs
+	var wg sync.WaitGroup
+	for _, v := range b.backgroundFunctions {
+		wg.Add(1)
+		go func(f BackgroundFunction) {
+			f(b.ctx, b.backgroundEvents)
+			wg.Done()
+		}(v)
+	}
+	defer wg.Wait()
+
 	periodic := time.NewTicker(minPeriodicInterval)
 	defer periodic.Stop()
 
@@ -195,6 +217,18 @@ func (b Bot) Run() (string, error) {
 					return err.Error(), nil
 				}
 			}
+		case bgEvent := <-b.backgroundEvents:
+
+			if err := func() error {
+				defer bgEvent.Close()
+				return retryTillInterrupt(b.ctx, func(ctx context.Context) error {
+					_, err := b.bot.Send(bgEvent)
+					return err
+				}, b.runtime)
+			}(); err != nil {
+				return err.Error(), nil
+			}
+
 		}
 	}
 }
