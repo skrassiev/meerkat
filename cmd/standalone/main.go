@@ -5,5 +5,5 @@ import (
 )
 
 func main() {
-	_, _ = bootstrap.Main("process")
+	_, _ = bootstrap.Main("process", bootstrap.ServiceModeCommands|bootstrap.ServiceModePeriodic)
 }

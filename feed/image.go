@@ -18,6 +18,11 @@ func (m chattableFileUploader) Close() error {
 	return m.Closer.Close()
 }
 
+// SetChatID
+func (c chattableFileUploader) SetChatID(chatID int64) {
+	c.BaseChat.ChatID = chatID
+}
+
 func getRemotePictureAsBytes(ctx context.Context, url string) (body io.ReadCloser, bodyLen int64, err error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {

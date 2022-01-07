@@ -41,7 +41,7 @@ func HandleCommandlTemp(ctx context.Context, cmd *tgbotapi.Message, _ *tgbotapi.
 	// For any other specifications than Chat ID or Text, you'll need to
 	// set fields on the `MessageConfig`.
 	// msg.ReplyToMessageID = update.Message.MessageID
-	return telega.ChattableText{Chattable: r}, nil
+	return &telega.ChattableText{MessageConfig: r}, nil
 }
 
 func scanTemperatureReading(reader io.Reader) (int32, error) {
