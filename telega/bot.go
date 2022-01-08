@@ -22,15 +22,37 @@ import (
 type ChattableCloser interface {
 	tgbotapi.Chattable
 	io.Closer
+	SetChatID(chatID int64)
 }
 
+// ChattableText is a simple chat message
 type ChattableText struct {
-	tgbotapi.Chattable
+	tgbotapi.MessageConfig
 }
 
 // Close is a noop function
 func (c ChattableText) Close() error {
 	return nil
+}
+
+// SetChatID
+func (c *ChattableText) SetChatID(chatID int64) {
+	c.BaseChat.ChatID = chatID
+}
+
+// ChattablePicture is a simple chat picture
+type ChattablePicture struct {
+	tgbotapi.PhotoConfig
+}
+
+// Close is a noop function
+func (c ChattablePicture) Close() error {
+	return nil
+}
+
+// SetChatID
+func (c *ChattablePicture) SetChatID(chatID int64) {
+	c.BaseChat.ChatID = chatID
 }
 
 // CommandHandler is a function, which can handle a specific bot command
@@ -130,6 +152,10 @@ func (b *Bot) AddPeriodicTask(interval time.Duration, reportMessage string, fn T
 	b.periodicTasks = append(b.periodicTasks, taskDef)
 }
 
+func (b *Bot) AddBackgroundTask(fn BackgroundFunction) {
+	b.backgroundFunctions = append(b.backgroundFunctions, fn)
+}
+
 // Run starts the bot till interrupted.
 func (b Bot) Run() (string, error) {
 	// parse restrictions
@@ -219,14 +245,20 @@ func (b Bot) Run() (string, error) {
 			}
 		case bgEvent := <-b.backgroundEvents:
 
-			if err := func() error {
-				defer bgEvent.Close()
-				return retryTillInterrupt(b.ctx, func(ctx context.Context) error {
-					_, err := b.bot.Send(bgEvent)
-					return err
-				}, b.runtime)
-			}(); err != nil {
-				return err.Error(), nil
+			log.Println("received BG event")
+
+			for k, _ := range allowedChatIDs {
+				bgEvent.SetChatID(k)
+				log.Printf("after  %+v\n", bgEvent)
+				if err := func() error {
+					defer bgEvent.Close()
+					return retryTillInterrupt(b.ctx, func(ctx context.Context) error {
+						_, err := b.bot.Send(bgEvent)
+						return err
+					}, b.runtime)
+				}(); err != nil {
+					return err.Error(), nil
+				}
 			}
 
 		}

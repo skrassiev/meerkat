@@ -4,7 +4,9 @@ import (
 	"context"
 	"io/fs"
 	"log"
+	"os"
 	"os/exec"
+	"path"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -112,7 +114,7 @@ func TestFS_MonitorDirRecursively(t *testing.T) {
 	cleanup(fsroot)
 
 	require.NoError(t, exec.Command("/bin/bash", "-c", "mkdir -p "+fsroot).Run())
-	bgFunc1 := monitorDirectoryTree(fsroot, fsAdd1)
+	bgFunc1 := monitorDirectoryTree(fsroot, FilenameFilter([]string{`\.jpg$/i`}), fsAdd1)
 	ctx, cancel := context.WithCancel(context.Background())
 	monitoringChannel := make(chan telega.ChattableCloser)
 
@@ -121,7 +123,7 @@ func TestFS_MonitorDirRecursively(t *testing.T) {
 
 	require.NoError(t, exec.Command("/bin/bash", "-c", "mkdir -p "+fsroot+dirStruct).Run())
 
-	bgFunc2 := monitorDirectoryTree(fsroot, fsAdd2)
+	bgFunc2 := monitorDirectoryTree(fsroot, FilenameFilter([]string{`\.jpg$/i`}), fsAdd2)
 
 	wg.Add(1)
 	go func() { bgFunc2(ctx, monitoringChannel); wg.Done() }()
@@ -161,7 +163,7 @@ func TestFS_MonitorDirConcurrently(t *testing.T) {
 	cleanup(fsroot)
 
 	require.NoError(t, exec.Command("/bin/bash", "-c", "mkdir -p "+fsroot).Run())
-	bgFunc1 := monitorDirectoryTree(fsroot, fsAdd)
+	bgFunc1 := monitorDirectoryTree(fsroot, FilenameFilter([]string{`\.jpg$/i`}), fsAdd)
 	ctx, cancel := context.WithCancel(context.Background())
 	monitoringChannel := make(chan telega.ChattableCloser)
 
@@ -183,22 +185,34 @@ func TestFS_MonitorDirConcurrently(t *testing.T) {
 	wg.Wait()
 }
 
-func TestFS_StockMonitorDir(t *testing.T) {
+func TestFS_MonitorDirFiles(t *testing.T) {
+
+	gotest = true
+	defer func() { gotest = false }()
+
 	var (
-		fsAdd = func(fpath string, watcher *fsnotify.Watcher) (exists bool, err error) {
-			err = watcher.Add(fpath)
-			assert.NoError(t, err, "Cannot add watch for directory"+fpath)
-			return false, err
+		fsMap            sync.Map
+		monitoredCounter int32
+		fsw              *fsnotify.Watcher
+		fsAdd            = func(fpath string, watcher *fsnotify.Watcher) (exists bool, err error) {
+			fsw = watcher
+			if _, loaded := fsMap.LoadOrStore(fpath, struct{}{}); !loaded {
+				atomic.AddInt32(&monitoredCounter, 1)
+				return false, watcher.Add(fpath)
+			}
+			return true, nil
 		}
 	)
+
 	fsroot := "fsroot"
 	var wg sync.WaitGroup
 
-	defer cleanup(fsroot)
+	//defer cleanup(fsroot)
+
 	cleanup(fsroot)
 
 	require.NoError(t, exec.Command("/bin/bash", "-c", "mkdir -p "+fsroot).Run())
-	bgFunc1 := monitorDirectoryTree(fsroot, fsAdd)
+	bgFunc1 := monitorDirectoryTree(fsroot, FilenameFilter([]string{`(?i)\.jpg$`}), fsAdd)
 	ctx, cancel := context.WithCancel(context.Background())
 	monitoringChannel := make(chan telega.ChattableCloser)
 
@@ -209,6 +223,53 @@ func TestFS_StockMonitorDir(t *testing.T) {
 	require.NoError(t, err)
 
 	time.Sleep(500 * time.Millisecond)
+	assert.Equal(t, mulArray(dirStructCount)+1, monitoredCounter)
+
+	testFiles := []struct {
+		level     int
+		filenames []string
+	}{
+		{
+			level:     2,
+			filenames: []string{"foo.txt", "bar.jpg", "baz.JPG", "foobar.png"},
+		},
+		{
+			level:     3,
+			filenames: []string{"foo.txt", "bar.jPg", "baz.JPG", "foobar.png"},
+		}, {
+			level:     3,
+			filenames: []string{"foo.jpg", "bar1.jpg", "baz.JPG", "foobar.png"},
+		}, {
+			level:     2,
+			filenames: []string{"foo.txt", "baz.JPG", "foobar.png"},
+		},
+	}
+	times := len(testFiles) - 1
+
+	rootFS := os.DirFS(fsroot)
+	fs.WalkDir(rootFS, ".", func(fpath string, d fs.DirEntry, err error) error {
+		if fpath == "." {
+			// enumerate top-level directory content
+			return nil
+		}
+
+		if times >= 0 {
+			if strings.Count(fpath, "/") == testFiles[times].level {
+				for _, v := range testFiles[times].filenames {
+
+					if f, err := os.Create(path.Join(fsroot, fpath, v)); err == nil {
+						f.Close()
+					}
+				}
+				times--
+			}
+		} else {
+			return fs.SkipDir
+		}
+		return nil
+	})
+
+	assert.NoError(t, fsw.Remove("fsroot/aac/bac"))
 
 	cleanup(fsroot)
 	time.Sleep(100 * time.Millisecond)

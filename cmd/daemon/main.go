@@ -69,7 +69,7 @@ func (service *Service) Manage() (string, error) {
 	}
 
 	// Do something, call your goroutines, etc
-	return bootstrap.Main("daemon")
+	return bootstrap.Main("daemon", bootstrap.ServiceModeCommands|bootstrap.ServiceModeHealthcheck|bootstrap.ServiceModePeriodic)
 }
 
 func init() {
