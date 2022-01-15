@@ -4,6 +4,7 @@ import (
 	"context"
 	"io/fs"
 	"log"
+	"mime"
 	"os"
 	"path"
 	"regexp"
@@ -129,20 +130,22 @@ func onFsModification(event fsnotify.Event, fsAdd fsnotifyAdderWrapper, walkRequ
 		return
 	}
 
-	if (event.Op & fsnotify.Create) != 0 {
+	if (event.Op & (fsnotify.Create | fsnotify.CloseWrite)) != 0 {
 		fi, err := os.Stat(event.Name)
 		if err != nil {
 			log.Println("onFsModification", event, err)
 			return
 		}
 		if fi.IsDir() {
-			if exists, err := fsAdd(event.Name); err != nil {
-				log.Println("failed to add directory", event.Name, "watch:", err)
-				return
-			} else if !exists {
-				walkRequests <- event.Name
+			if (event.Op & fsnotify.Create) != 0 {
+				if exists, err := fsAdd(event.Name); err != nil {
+					log.Println("failed to add directory", event.Name, "watch:", err)
+					return
+				} else if !exists {
+					walkRequests <- event.Name
+				}
 			}
-		} else { //if (event.Op & fsnotify.Write) != 0 {
+		} else if (event.Op & fsnotify.CloseWrite) != 0 {
 			// it's a newly created file
 			//log.Println("modified or created file:", event.Name)
 			if filter(event.Name) {
@@ -163,8 +166,18 @@ func onFsModification(event fsnotify.Event, fsAdd fsnotifyAdderWrapper, walkRequ
 
 func processFile(fname string) (telega.ChattableCloser, error) {
 	log.Println("process file", fname)
-	return &telega.ChattablePicture{
-		PhotoConfig: tgbotapi.NewPhotoUpload(0, fname),
+	switch strings.Split(mime.TypeByExtension(path.Ext(fname)), "/")[0] {
+	case "image":
+		return &telega.ChattablePicture{
+			PhotoConfig: tgbotapi.NewPhotoUpload(0, fname),
+		}, nil
+	case "video":
+		return &telega.ChattableVideo{
+			VideoConfig: tgbotapi.NewVideoUpload(0, fname),
+		}, nil
+	}
+	return &telega.ChattableDocument{
+		DocumentConfig: tgbotapi.NewDocumentUpload(0, fname),
 	}, nil
 }
 
@@ -230,7 +243,7 @@ func FilenameFilter(regexpPatterns []string) FilterFunc {
 	}
 }
 
-// NewFileFilterChain returns only if a fle is created after the launch
+// NewFileFilterChain returns true only if a file is created after the launch
 func NewfileFilterChain(filter FilterFunc) FilterFunc {
 	started := time.Now()
 	return func(fpath string) bool {
@@ -239,6 +252,41 @@ func NewfileFilterChain(filter FilterFunc) FilterFunc {
 				if stat.ModTime().After(started) {
 					return true
 				}
+			}
+		}
+		return false
+	}
+}
+
+// RatelimitFilterChain returns true only if file of the same MIME type updated in the same dir not more often than oncePerDuration
+func RatelimitFilterChain(oncePerDuration time.Duration, filter FilterFunc) FilterFunc {
+	type pathT string
+	type mimeT string
+	lastTimestamp := make(map[pathT]map[mimeT]time.Time)
+
+	mtype := func(fpath string) string {
+		switch m := strings.Split(mime.TypeByExtension(path.Ext(fpath)), "/")[0]; {
+		case "image" == m:
+			fallthrough
+		case "video" == m:
+			return m
+		}
+		return "any"
+	}
+
+	return func(fpath string) bool {
+		if filter(fpath) {
+			d := pathT(path.Dir(fpath))
+			p, exists := lastTimestamp[d]
+			if !exists {
+				p = make(map[mimeT]time.Time)
+				lastTimestamp[d] = p
+			}
+
+			m := mimeT(mtype(fpath))
+			if t, exists := p[m]; !exists || time.Since(t) >= oncePerDuration {
+				p[m] = time.Now()
+				return true
 			}
 		}
 		return false

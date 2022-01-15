@@ -4,6 +4,7 @@ import (
 	"context"
 	"io/fs"
 	"log"
+	"mime"
 	"os"
 	"os/exec"
 	"path"
@@ -276,4 +277,9 @@ func TestFS_MonitorDirFiles(t *testing.T) {
 
 	cancel()
 	wg.Wait()
+}
+
+func TestMIME_Std(t *testing.T) {
+	assert.Equal(t, "video", strings.Split(mime.TypeByExtension(path.Ext("foo/bar/baz/add.mP4")), "/")[0])
+	assert.Equal(t, "image", strings.Split(mime.TypeByExtension(path.Ext("baz/bar/foo/pic.jpG")), "/")[0])
 }
