@@ -60,13 +60,16 @@ func Main(runtime string, serviceMode byte) (status string, err error) {
 		// add FS monitor
 		log.Println("adding background tasks")
 		directores := os.Getenv("MONITORED_DIRECTORIES")
+		rateLimit, _ := time.ParseDuration(os.Getenv("FS_RATE_LIMIT"))
+		log.Println("rate limit requested", rateLimit)
+
 		if len(strings.TrimSpace(directores)) > 0 {
 			for _, v := range strings.Split(strings.TrimSpace(directores), ";") {
 				if fs.ValidPath(v) {
-					bot.AddBackgroundTask(feed.MonitorDirectoryTree(v, feed.NewfileFilterChain(feed.FilenameFilter([]string{`(?i)\.jpg$`}))))
+					bot.AddBackgroundTask(feed.MonitorDirectoryTree(v, feed.RatelimitFilterChain(rateLimit, feed.NewfileFilterChain(feed.FilenameFilter([]string{`(?i)\.jpg$`, `\.mp4$`})))))
 				} else {
 					log.Println("fsmonitor: invalid path", v)
-					bot.AddBackgroundTask(feed.MonitorDirectoryTree(v, feed.NewfileFilterChain(feed.FilenameFilter([]string{`(?i)\.jpg$`}))))
+					bot.AddBackgroundTask(feed.MonitorDirectoryTree(v, feed.RatelimitFilterChain(rateLimit, feed.NewfileFilterChain(feed.FilenameFilter([]string{`(?i)\.jpg$`, `\.mp4`})))))
 				}
 			}
 		}

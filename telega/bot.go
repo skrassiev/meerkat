@@ -55,6 +55,36 @@ func (c *ChattablePicture) SetChatID(chatID int64) {
 	c.BaseChat.ChatID = chatID
 }
 
+// ChattableVideo is a simple chat video
+type ChattableVideo struct {
+	tgbotapi.VideoConfig
+}
+
+// Close is a noop function
+func (c ChattableVideo) Close() error {
+	return nil
+}
+
+// SetChatID
+func (c *ChattableVideo) SetChatID(chatID int64) {
+	c.BaseChat.ChatID = chatID
+}
+
+// ChattableDocument is a simple chat video
+type ChattableDocument struct {
+	tgbotapi.DocumentConfig
+}
+
+// Close is a noop function
+func (c ChattableDocument) Close() error {
+	return nil
+}
+
+// SetChatID
+func (c *ChattableDocument) SetChatID(chatID int64) {
+	c.BaseChat.ChatID = chatID
+}
+
 // CommandHandler is a function, which can handle a specific bot command
 type CommandHandler func(ctx context.Context, cmd *tgbotapi.Message, bot *tgbotapi.BotAPI) (response ChattableCloser, err error)
 
