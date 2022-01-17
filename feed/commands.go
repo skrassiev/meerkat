@@ -4,7 +4,7 @@ import (
 	"context"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
-	"github.com/skrassiev/gsnowmelt_bot/telega"
+	"github.com/skrassiev/meerkat/telega"
 )
 
 // PingCommand reads temp from a sensor and reponds in a telegram message.

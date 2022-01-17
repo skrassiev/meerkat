@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/skrassiev/gsnowmelt_bot/bootstrap"
+	"github.com/skrassiev/meerkat/bootstrap"
 )
 
 func main() {

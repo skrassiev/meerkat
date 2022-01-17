@@ -16,7 +16,7 @@ import (
 	"time"
 
 	"github.com/fsnotify/fsnotify"
-	"github.com/skrassiev/gsnowmelt_bot/telega"
+	"github.com/skrassiev/meerkat/telega"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
