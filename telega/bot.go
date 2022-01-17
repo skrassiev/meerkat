@@ -135,7 +135,7 @@ func (b *Bot) Init(ctx context.Context, runtime string) error {
 
 	c := &http.Client{Timeout: httpTimeout}
 	err = retryTillInterrupt(ctx, func(_ context.Context) error {
-		b.bot, err = tgbotapi.NewBotAPIWithClient(os.Getenv("TELEGRAM_APITOKEN"), c)
+		b.bot, err = tgbotapi.NewBotAPIWithClient(os.Getenv("TELEGRAM_APITOKEN"), tgbotapi.APIEndpoint, c)
 
 		return err
 	}, runtime)
