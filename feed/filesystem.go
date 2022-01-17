@@ -169,15 +169,15 @@ func processFile(fname string) (telega.ChattableCloser, error) {
 	switch strings.Split(mime.TypeByExtension(path.Ext(fname)), "/")[0] {
 	case "image":
 		return &telega.ChattablePicture{
-			PhotoConfig: tgbotapi.NewPhotoUpload(0, fname),
+			PhotoConfig: tgbotapi.NewPhoto(0, tgbotapi.FilePath(fname)),
 		}, nil
 	case "video":
 		return &telega.ChattableVideo{
-			VideoConfig: tgbotapi.NewVideoUpload(0, fname),
+			VideoConfig: tgbotapi.NewVideo(0, tgbotapi.FilePath(fname)),
 		}, nil
 	}
 	return &telega.ChattableDocument{
-		DocumentConfig: tgbotapi.NewDocumentUpload(0, fname),
+		DocumentConfig: tgbotapi.NewDocument(0, tgbotapi.FilePath(fname)),
 	}, nil
 }
 

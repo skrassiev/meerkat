@@ -41,14 +41,14 @@ func getRemotePictureAsBytes(ctx context.Context, url string) (body io.ReadClose
 // GetPictureByURL serves an image from a remote URL.
 func GetPictureByURL(fileURL string) telega.CommandHandler {
 	return func(ctx context.Context, cmd *tgbotapi.Message, _ *tgbotapi.BotAPI) (response telega.ChattableCloser, _ error) {
-		body, len, err := getRemotePictureAsBytes(ctx, fileURL)
+		body, _, err := getRemotePictureAsBytes(ctx, fileURL)
 		if err != nil {
 			return nil, err
 		}
-		return chattableFileUploader{tgbotapi.NewPhotoUpload(cmd.Chat.ID, tgbotapi.FileReader{
+		return chattableFileUploader{tgbotapi.NewPhoto(cmd.Chat.ID, tgbotapi.FileReader{
 			Name:   "dacha.jpg",
 			Reader: body,
-			Size:   len,
+			//Size:   len,
 		}), body}, nil
 	}
 }
