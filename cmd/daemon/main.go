@@ -5,7 +5,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/skrassiev/gsnowmelt_bot/bootstrap"
+	"github.com/skrassiev/meerkat/bootstrap"
 	"github.com/takama/daemon"
 )
 

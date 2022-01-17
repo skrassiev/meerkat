@@ -13,8 +13,8 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/skrassiev/gsnowmelt_bot/feed"
-	"github.com/skrassiev/gsnowmelt_bot/telega"
+	"github.com/skrassiev/meerkat/feed"
+	"github.com/skrassiev/meerkat/telega"
 )
 
 type ServiceMode byte

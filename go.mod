@@ -1,4 +1,4 @@
-module github.com/skrassiev/gsnowmelt_bot
+module github.com/skrassiev/meerkat
 
 go 1.16
 

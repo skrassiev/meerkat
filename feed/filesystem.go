@@ -13,7 +13,7 @@ import (
 
 	"github.com/fsnotify/fsnotify"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
-	"github.com/skrassiev/gsnowmelt_bot/telega"
+	"github.com/skrassiev/meerkat/telega"
 )
 
 // fsnotifyAdder adds fpath to inotify watch list. Returns error if fails to add and exists == false.
@@ -95,7 +95,7 @@ func monitorDirectoryTree(directory string, filter FilterFunc, fsAddWatch fsnoti
 					if !ok {
 						return
 					}
-					log.Println("event:", event)
+					//log.Println("event:", event)
 					if fname := onFsModification(event, fsAddWatchWrapper, directoriesToScan, filter); len(fname) != 0 {
 						handleModifiedFile(fname)
 					}

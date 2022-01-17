@@ -8,4 +8,4 @@ pi3:
 	GOOS=linux GOARCH=arm go build cmd/fs/main.go
 
 test:
-	go test -v ./... -args --public-ip=$$(curl ifconfig.io)
+	go test -v ./... -args --public-ip=$$(curl api.ipify.org)
