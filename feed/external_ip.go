@@ -12,7 +12,8 @@ import (
 )
 
 var (
-	publicIP             net.IP
+	storedIP             IPv4
+	publicIP             = net.ParseIP(storedIP.read())
 	publicIPResolverURLs = []string{"http://ifconfig.io", "https://api.ipify.org"}
 	publicIPResolverURL  = publicIPResolverURLs[1]
 )
@@ -54,7 +55,9 @@ func PublicIP(ctx context.Context) (ipAddress string) {
 				if newIP != nil {
 					if !newIP.Equal(publicIP) {
 						publicIP = newIP
-						return publicIP.String()
+						storedIP = IPv4(publicIP.String())
+						storedIP.write()
+						return string(storedIP)
 					}
 					return ""
 				}

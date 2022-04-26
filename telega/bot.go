@@ -2,6 +2,7 @@ package telega
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -178,7 +179,7 @@ func (b *Bot) AddPeriodicTask(interval time.Duration, reportMessage string, fn T
 		taskDef.interval = uint32(math.Floor(fullIntervals))
 	}
 
-	log.Println("added task to run every", uint32(time.Duration(taskDef.interval)*minPeriodicInterval/time.Minute), "minutes")
+	log.Println("added task [", taskDef.intro, "] to run every", uint32(time.Duration(taskDef.interval)*minPeriodicInterval/time.Minute), "minutes")
 	b.periodicTasks = append(b.periodicTasks, taskDef)
 }
 
@@ -326,6 +327,13 @@ func notificationMessageWrapper(ctx context.Context, msgInfo string, messageFunc
 		for _, v := range chatIDs {
 			msg := tgbotapi.NewMessage(v, fmt.Sprintf("%s %s", msgInfo, msgText))
 			if _, err := bot.Send(msg); err != nil {
+				var tgErr *tgbotapi.Error
+				if errors.As(err, &tgErr) {
+					if tgErr.Code == 400 && tgErr.Message == "Bad Request: chat not found" {
+						log.Println("api error:", tgErr.Message)
+						continue
+					}
+				}
 				// Note that panics are a bad way to handle errors. Telegram can
 				// have service outages or network errors, you should retry sending
 				// messages or more gracefully handle failures.
