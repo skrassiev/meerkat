@@ -22,7 +22,7 @@ import (
 )
 
 const (
-	fsnotifyNoEntError = "can't remove non-existent inotify watch for"
+	fsnotifyNoEntError = "can't remove non-existent watcher"
 	dirStruct          = "/{aaa,aab,aac,aad,aae,aaf,aag}/{baa,bab,bac,bad,bae,baf,bag}/{caa,cab,cac,cad,cae,caf,cag}/{foo,bar,baz}i/{alpha,beta,gamma,theta}"
 )
 
