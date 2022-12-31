@@ -6,7 +6,6 @@ require (
 	github.com/fsnotify/fsnotify v1.6.0
 	github.com/go-telegram-bot-api/telegram-bot-api/v5 v5.5.1
 	github.com/stretchr/testify v1.7.0
-	github.com/takama/daemon v1.0.0
 )
 
 replace github.com/fsnotify/fsnotify v1.6.0 => github.com/skrassiev/fsnotify v1.6.0-closewrite-b1
