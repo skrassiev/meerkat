@@ -1,5 +1,12 @@
 # Testing
 
+## Test successful punlic IP
+
+```bash
+TEST_PUBLIC_IP=$(curl ifconfig.io) go test -v ./...
+```
+
+
 ## Block remote service on linux
 
 To test failing remote service, such as api.ipify.org, block all IPs of that FQDN with:
