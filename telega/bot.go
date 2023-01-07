@@ -116,6 +116,15 @@ func (e interruptedErr) Error() string {
 	return e.msg
 }
 
+// chat was not found error.
+type chatNotFound struct {
+	err *tgbotapi.Error
+}
+
+func (e chatNotFound) Error() string {
+	return "Bad Request: chat not found"
+}
+
 // Bot is a highger-level wrapper over tgbotpi. Allow adding service handlers and periodic functions.
 type Bot struct {
 	bot                 *tgbotapi.BotAPI
@@ -278,6 +287,8 @@ func (b Bot) Run() (string, error) {
 
 			log.Println("received BG event")
 
+			var invalidChatIDs []int64
+			//= make(map[int64]interface{})
 			for k, _ := range allowedChatIDs {
 				bgEvent.SetChatID(k)
 				log.Printf("after  %+v\n", bgEvent)
@@ -288,10 +299,17 @@ func (b Bot) Run() (string, error) {
 						return err
 					}, b.runtime)
 				}(); err != nil {
-					return err.Error(), nil
+					var chatErr chatNotFound
+					if !errors.As(err, &chatErr) {
+						return err.Error(), nil
+					}
+					log.Println("chat", k, "not found")
+					invalidChatIDs = append(invalidChatIDs, k)
 				}
 			}
-
+			for _, v := range invalidChatIDs {
+				delete(allowedChatIDs, v)
+			}
 		}
 	}
 }
@@ -309,7 +327,11 @@ func (b *Bot) processPeriodicTasks(chatIDs []int64) {
 func retryTillInterrupt(ctx context.Context, f func(ctx context.Context) error, runtime string) error {
 	for {
 		if err := f(ctx); err != nil {
-			log.Println("Telegram API failiure", err)
+			log.Println("Telegram API failure", err)
+			var vv chatNotFound
+			if errors.As(err, &vv.err) && vv.Error() == vv.err.Message {
+				return vv
+			}
 			select {
 			case <-ctx.Done():
 				return interruptedErr{fmt.Sprintf("%s was cancelled", runtime)}
