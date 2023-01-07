@@ -3,7 +3,6 @@ package bootstrap
 import (
 	"context"
 	"fmt"
-	"io/fs"
 	"log"
 	"os"
 	"strings"
@@ -65,7 +64,8 @@ func Main(runtime string, serviceMode byte) (status string, err error) {
 
 		if len(strings.TrimSpace(directores)) > 0 {
 			for _, v := range strings.Split(strings.TrimSpace(directores), ";") {
-				if fs.ValidPath(v) {
+				log.Println("checking path:", v)
+				if finf, err := os.Stat(v); err == nil && finf.IsDir() {
 					bot.AddBackgroundTask(feed.MonitorDirectoryTree(v, feed.RatelimitFilterChain(rateLimit, feed.NewfileFilterChain(feed.FilenameFilter([]string{`(?i)\.jpg$`, `\.mp4$`})))))
 				} else {
 					log.Println("fsmonitor: invalid path", v)
