@@ -11,6 +11,7 @@ var (
 	fServiceModePeriodic    = flag.Bool("mode-periodic", false, "periodic background tasks (IP-change)")
 	fServiceModeFSMon       = flag.Bool("mode-fsmon", false, "monitor file system for images")
 	fServiceModeHealthcheck = flag.Bool("mode-healthcheck", false, "ping-pong")
+	fServiceModeTempMonitor = flag.Bool("mode-tempmon", false, "monitor and report temp changes more than 0.5")
 )
 
 func main() {
@@ -27,6 +28,9 @@ func main() {
 	}
 	if *fServiceModeHealthcheck {
 		runmode |= bootstrap.ServiceModeHealthcheck
+	}
+	if *fServiceModeTempMonitor {
+		runmode |= bootstrap.ServiceModeTempMonitor
 	}
 
 	_, _ = bootstrap.Main("process", runmode)

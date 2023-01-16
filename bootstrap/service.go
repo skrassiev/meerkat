@@ -24,6 +24,7 @@ const (
 	ServiceModePeriodic
 	ServiceModeFSMoinitor
 	ServiceModeHealthcheck
+	ServiceModeTempMonitor
 )
 
 // Main adds standard handlers to the telega bot.
@@ -53,6 +54,12 @@ func Main(runtime string, serviceMode byte) (status string, err error) {
 		// add periodic tasks
 		log.Println("adding periodic tasks handlers")
 		bot.AddPeriodicTask(30*time.Minute, "Public IP Changed:", feed.PublicIP)
+	}
+
+	if (serviceMode & ServiceModeTempMonitor) == ServiceModeTempMonitor {
+		// add temperature change monitoring
+		log.Println("adding temperature change monitoring")
+		bot.AddPeriodicTask(5*time.Minute, "Temperature changed:", feed.TemperatureMonitor)
 	}
 
 	if (serviceMode & ServiceModeFSMoinitor) == ServiceModeFSMoinitor {
