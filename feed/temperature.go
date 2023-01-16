@@ -6,9 +6,11 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"math"
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -19,24 +21,27 @@ import (
 )
 
 const (
-	sensorDevicePath        = "/sys/bus/w1/devices/28-3c01d607ca0a/w1_slave"
-	errTemp           int32 = -1000
-	maxRetries              = 10
-	minRereshInterval       = 5 * time.Second
+	sensorDevicePath               = "/sys/bus/w1/devices/28-3c01d607ca0a/w1_slave"
+	errTemp                  int32 = -1000
+	maxRetries                     = 10
+	minRereshInterval              = 5 * time.Second
+	monitoredTemperatureDiff       = 0.5
 )
 
 var (
-	lastTemp = errTemp
-	lastTime = time.Now().Local().Add(-minRereshInterval)
+	lastTemp             = errTemp
+	lastTime             = time.Now().Local().Add(-minRereshInterval)
+	lastTimeMutex        sync.RWMutex
+	monitoredTemperature = int32(-10.0)
 )
 
 // HandlerCommandTemp reads temp from a sensor and reponds in a telegram message.
 func HandleCommandlTemp(ctx context.Context, cmd *tgbotapi.Message, _ *tgbotapi.BotAPI) (response telega.ChattableCloser, _ error) {
-	v, _ := getTemperatureReadingWithRetries(ctx, sensorDevicePath, 10)
+	v, ts, _ := getTemperatureReadingWithRetries(ctx, sensorDevicePath, 10)
 	// Now that we know we've gotten a new message, we can construct a
 	// reply! We'll take the Chat ID and Text from the incoming message
 	// and use it to create a new message.
-	r := tgbotapi.NewMessage(cmd.Chat.ID, fmt.Sprintf("%.1f ℃ 🌡 on %v", float32(v)/1000.0, lastTime.Format("Jan 2 15:04:05")))
+	r := tgbotapi.NewMessage(cmd.Chat.ID, fmt.Sprintf("%.1f ℃ 🌡 on %v", float32(v)/1000.0, ts.Format("Jan 2 15:04:05")))
 	// We'll also say that this message is a reply to the previous message.
 	// For any other specifications than Chat ID or Text, you'll need to
 	// set fields on the `MessageConfig`.
@@ -82,11 +87,15 @@ func getTemperatureReading(fpath string) (int32, error) {
 	return scanTemperatureReading(f)
 }
 
-func getTemperatureReadingWithRetries(ctx context.Context, fpath string, retries int) (temperature int32, err error) {
+func getTemperatureReadingWithRetries(ctx context.Context, fpath string, retries int) (temperature int32, timestamp time.Time, err error) {
 	// do not allow more frequent polls
+	lastTimeMutex.RLock()
 	if time.Since(lastTime) < minRereshInterval {
-		return atomic.LoadInt32(&lastTemp), nil
+		defer lastTimeMutex.RUnlock()
+		return atomic.LoadInt32(&lastTemp), lastTime, nil
 	}
+	timestamp = lastTime
+	lastTimeMutex.RUnlock()
 
 	if retries > maxRetries {
 		retries = maxRetries
@@ -110,10 +119,26 @@ func getTemperatureReadingWithRetries(ctx context.Context, fpath string, retries
 
 	if err == nil {
 		atomic.StoreInt32(&lastTemp, temperature)
+		lastTimeMutex.Lock()
 		lastTime = time.Now() // ignore concurrency issues
+		timestamp = lastTime
+		lastTimeMutex.Unlock()
 	} else {
 		temperature = atomic.LoadInt32(&lastTemp)
 	}
 
 	return
+}
+
+// TemperatureMonitor 's for temp changes over the threshold
+func TemperatureMonitor(ctx context.Context) (temprature string) {
+	v, _, err := getTemperatureReadingWithRetries(ctx, sensorDevicePath, 10)
+	if err != nil {
+		return onError("error reading temperature", err)
+	}
+	if math.Abs(float64(v-monitoredTemperature)) > monitoredTemperatureDiff {
+		monitoredTemperature = v
+		return fmt.Sprintf("%.1f ℃ 🌡", float32(v)/1000.0)
+	}
+	return ""
 }

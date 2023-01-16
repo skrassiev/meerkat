@@ -2,3 +2,8 @@
 *.swp
 *.log
 *.back
+Makefile.install
+feed/foodir/
+main
+meerkat
+var/
