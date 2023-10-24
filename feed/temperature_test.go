@@ -3,6 +3,7 @@ package feed
 import (
 	"context"
 	"os"
+	"path"
 	"strings"
 	"testing"
 	"time"
@@ -66,4 +67,39 @@ func Test004_tempParseFilePersistent(t *testing.T) {
 	v, _, err = getTemperatureReadingWithRetries(ctx, testDataDir+sensorDevicePath, 0)
 	assert.NoError(t, err)
 	assert.Equal(t, int32(29812), v)
+}
+
+func Test005_tempMonitorChanges(t *testing.T) {
+
+	const (
+		datapath = "temp_sensor_readings/"
+		t88      = "28_8c"
+		t95      = "29_5c"
+		t98      = "29_8c"
+		tr28     = "32_8c"
+		m108     = "minus_10_8_c"
+		m104     = "minus_10_4_c"
+	)
+
+	var noDelayCtx = func() context.Context {
+		return context.WithValue(context.Background(), sensorMinReadingIntervalPathKey, 1*time.Nanosecond)
+	}
+
+	ctx := context.WithValue(noDelayCtx(), sensorDevicePathKey, path.Join(testDataDir, datapath, t98))
+	assert.True(t, strings.HasPrefix(TemperatureMonitor(ctx), "29.8"))
+
+	ctx = context.WithValue(noDelayCtx(), sensorDevicePathKey, path.Join(testDataDir, datapath, t95))
+	assert.Empty(t, TemperatureMonitor(ctx))
+
+	ctx = context.WithValue(noDelayCtx(), sensorDevicePathKey, path.Join(testDataDir, datapath, t88))
+	assert.True(t, strings.HasPrefix(TemperatureMonitor(ctx), "28.8"))
+
+	ctx = context.WithValue(noDelayCtx(), sensorDevicePathKey, path.Join(testDataDir, datapath, tr28))
+	assert.True(t, strings.HasPrefix(TemperatureMonitor(ctx), "32.8"))
+
+	ctx = context.WithValue(noDelayCtx(), sensorDevicePathKey, path.Join(testDataDir, datapath, m108))
+	assert.True(t, strings.HasPrefix(TemperatureMonitor(ctx), "-10.8"))
+
+	ctx = context.WithValue(noDelayCtx(), sensorDevicePathKey, path.Join(testDataDir, datapath, m104))
+	assert.Empty(t, TemperatureMonitor(ctx))
 }
