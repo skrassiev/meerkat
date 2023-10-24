@@ -153,6 +153,7 @@ func TemperatureMonitor(ctx context.Context) string {
 	if err != nil {
 		return onError("error reading temperature", err)
 	}
+	log.Println("temperature monitor: prev:", monitoredTemperature, "curr:", v)
 	if math.Abs(float64(v-monitoredTemperature)) > monitoredTemperatureDiff {
 		monitoredTemperature = v
 		return fmt.Sprintf("%.1f ℃ 🌡", float32(v)/1000.0)
