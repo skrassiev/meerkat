@@ -21,11 +21,13 @@ import (
 )
 
 const (
-	sensorDevicePath               = "/sys/bus/w1/devices/28-3c01d607ca0a/w1_slave"
-	errTemp                  int32 = -1000
-	maxRetries                     = 10
-	minRereshInterval              = 5 * time.Second
-	monitoredTemperatureDiff       = 0.5
+	sensorDevicePath                      = "/sys/bus/w1/devices/28-3c01d607ca0a/w1_slave"
+	sensorDevicePathKey                   = "device-path"
+	sensorMinReadingIntervalPathKey       = "min-read"
+	errTemp                         int32 = -1000
+	maxRetries                            = 10
+	minRereshInterval                     = 5 * time.Second
+	monitoredTemperatureDiff              = 500
 )
 
 var (
@@ -88,9 +90,17 @@ func getTemperatureReading(fpath string) (int32, error) {
 }
 
 func getTemperatureReadingWithRetries(ctx context.Context, fpath string, retries int) (temperature int32, timestamp time.Time, err error) {
+
+	var refreshInterval = func() time.Duration {
+		if p, ok := ctx.Value(sensorMinReadingIntervalPathKey).(time.Duration); ok {
+			return p
+		}
+		return minRereshInterval
+	}
+
 	// do not allow more frequent polls
 	lastTimeMutex.RLock()
-	if time.Since(lastTime) < minRereshInterval {
+	if time.Since(lastTime) < refreshInterval() {
 		defer lastTimeMutex.RUnlock()
 		return atomic.LoadInt32(&lastTemp), lastTime, nil
 	}
@@ -131,11 +141,19 @@ func getTemperatureReadingWithRetries(ctx context.Context, fpath string, retries
 }
 
 // TemperatureMonitor 's for temp changes over the threshold
-func TemperatureMonitor(ctx context.Context) (temprature string) {
-	v, _, err := getTemperatureReadingWithRetries(ctx, sensorDevicePath, 10)
+func TemperatureMonitor(ctx context.Context) string {
+	var devicePath = func() string {
+		if p, ok := ctx.Value(sensorDevicePathKey).(string); ok {
+			return p
+		}
+		return sensorDevicePath
+	}
+
+	v, _, err := getTemperatureReadingWithRetries(ctx, devicePath(), 10)
 	if err != nil {
 		return onError("error reading temperature", err)
 	}
+	log.Println("temperature monitor: prev:", monitoredTemperature, "curr:", v)
 	if math.Abs(float64(v-monitoredTemperature)) > monitoredTemperatureDiff {
 		monitoredTemperature = v
 		return fmt.Sprintf("%.1f ℃ 🌡", float32(v)/1000.0)

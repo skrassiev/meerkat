@@ -316,8 +316,10 @@ func (b Bot) Run() (string, error) {
 
 func (b *Bot) processPeriodicTasks(chatIDs []int64) {
 	b.periodicTaskCycle++
+	log.Println("bot: processing periodic tasks")
 	for _, h := range b.periodicTasks {
-		if b.periodicTaskCycle/h.interval == 0 {
+		log.Println("bot: executing periodic task", h.intro, b.periodicTaskCycle, h.interval, (b.periodicTaskCycle % h.interval))
+		if b.periodicTaskCycle%h.interval == 0 {
 			notificationMessageWrapper(b.ctx, h.intro, h.fn, b.bot, chatIDs)
 		}
 	}
