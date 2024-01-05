@@ -21,7 +21,7 @@ import (
 )
 
 const (
-	sensorDevicePath                      = "/sys/bus/w1/devices/28-3c01d607ca0a/w1_slave"
+	sensorDevicePath                      = "/sys/bus/w1/devices/28-3c01d607cfc6/w1_slave"
 	sensorDevicePathKey                   = "device-path"
 	sensorMinReadingIntervalPathKey       = "min-read"
 	errTemp                         int32 = -1000
