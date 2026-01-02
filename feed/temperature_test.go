@@ -39,7 +39,7 @@ func Test002_tempParseGood(t *testing.T) {
 }
 
 func Test003_tempParseFile(t *testing.T) {
-	v, err := getTemperatureReading(testDataDir + sensorDevicePath)
+	v, err := getTemperatureReading(testDataDir + sensorDevicePath())
 	assert.NoError(t, err)
 	assert.Equal(t, int32(29812), v)
 
@@ -48,23 +48,23 @@ func Test003_tempParseFile(t *testing.T) {
 func Test004_tempParseFilePersistent(t *testing.T) {
 	ctx := context.Background()
 
-	v, ts, err := getTemperatureReadingWithRetries(ctx, testDataDir+sensorDevicePath, 11)
+	v, ts, err := getTemperatureReadingWithRetries(ctx, testDataDir+sensorDevicePath(), 11)
 	assert.NoError(t, err)
 	assert.LessOrEqual(t, time.Now().Sub(ts).Seconds(), 5.0)
 	assert.Equal(t, int32(29812), v)
 
-	v, _, err = getTemperatureReadingWithRetries(ctx, testDataDir+sensorDevicePath, 1000)
+	v, _, err = getTemperatureReadingWithRetries(ctx, testDataDir+sensorDevicePath(), 1000)
 	assert.NoError(t, err)
 	assert.Equal(t, int32(29812), v)
 
 	lastTime = time.Now().Add(-minRereshInterval)
-	v, _, err = getTemperatureReadingWithRetries(ctx, testDataDir+sensorDevicePath, -1)
+	v, _, err = getTemperatureReadingWithRetries(ctx, testDataDir+sensorDevicePath(), -1)
 	assert.NoError(t, err)
 	assert.Equal(t, int32(29812), v)
 
 	lastTime = time.Now().Add(-minRereshInterval)
 	lastTemp = errTemp
-	v, _, err = getTemperatureReadingWithRetries(ctx, testDataDir+sensorDevicePath, 0)
+	v, _, err = getTemperatureReadingWithRetries(ctx, testDataDir+sensorDevicePath(), 0)
 	assert.NoError(t, err)
 	assert.Equal(t, int32(29812), v)
 }
