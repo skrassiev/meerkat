@@ -4,5 +4,7 @@ all:
 armh:
 	GOOS=linux GOARCH=arm go build -o meerkat cmd/main.go
 
+rpi2:
+	GOOS=linux GOARCH=arm GOARM=6 go build -o meerkat cmd/main.go
 test:
 	go test -v ./... -args --public-ip=$$(curl api.ipify.org)
