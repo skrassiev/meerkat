@@ -21,13 +21,13 @@ import (
 )
 
 const (
-	sensorDevicePath                      = "/sys/bus/w1/devices/28-3c01d607ca0a/w1_slave"
 	sensorDevicePathKey                   = "device-path"
 	sensorMinReadingIntervalPathKey       = "min-read"
 	errTemp                         int32 = -1000
 	maxRetries                            = 10
 	minRereshInterval                     = 5 * time.Second
 	monitoredTemperatureDiff              = 500
+	defaultW1DeviceName                   = "28-3c01d607ca0a"
 )
 
 var (
@@ -35,11 +35,25 @@ var (
 	lastTime             = time.Now().Local().Add(-minRereshInterval)
 	lastTimeMutex        sync.RWMutex
 	monitoredTemperature = int32(-10.0)
+	initPathOnce         sync.Once
+	sensorDevicePathTpl  = "/sys/bus/w1/devices/%s/w1_slave"
+	sensorFilepath       string
 )
+
+func sensorDevicePath() string {
+	initPathOnce.Do(func() {
+		if deviceName := os.Getenv("W1_DEVICE_NAME"); len(deviceName) > 0 {
+			sensorFilepath = fmt.Sprintf(sensorDevicePathTpl, deviceName)
+		} else {
+			sensorFilepath = fmt.Sprintf(sensorDevicePathTpl, defaultW1DeviceName)
+		}
+	})
+	return sensorFilepath
+}
 
 // HandlerCommandTemp reads temp from a sensor and reponds in a telegram message.
 func HandleCommandlTemp(ctx context.Context, cmd *tgbotapi.Message, _ *tgbotapi.BotAPI) (response telega.ChattableCloser, _ error) {
-	v, ts, _ := getTemperatureReadingWithRetries(ctx, sensorDevicePath, 10)
+	v, ts, _ := getTemperatureReadingWithRetries(ctx, sensorDevicePath(), 10)
 	// Now that we know we've gotten a new message, we can construct a
 	// reply! We'll take the Chat ID and Text from the incoming message
 	// and use it to create a new message.
@@ -146,7 +160,7 @@ func TemperatureMonitor(ctx context.Context) string {
 		if p, ok := ctx.Value(sensorDevicePathKey).(string); ok {
 			return p
 		}
-		return sensorDevicePath
+		return sensorDevicePath()
 	}
 
 	v, _, err := getTemperatureReadingWithRetries(ctx, devicePath(), 10)

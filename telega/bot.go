@@ -205,7 +205,7 @@ func (b Bot) Run() (string, error) {
 	}
 
 	var (
-		allowedChatIDs = make(map[int64]interface{})
+		allowedChatIDs = make(map[int64]any)
 		chatIDs        = make([]int64, 0)
 	)
 

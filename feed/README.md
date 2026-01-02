@@ -1,6 +1,6 @@
 # Testing
 
-## Test successful punlic IP
+## Test successful public IP
 
 ```bash
 TEST_PUBLIC_IP=$(curl ifconfig.io) go test -v ./...
