@@ -80,7 +80,7 @@ func monitorDirectoryTree(directory string, filter FilterFunc, fsAddWatch fsnoti
 		handleModifiedFile := func(fname string) {
 			if tgEvent, err := processFile(fname); err != nil {
 				log.Println("eror handling file", fname)
-			} else if !gotest {
+			} else if tgEvent != nil && !gotest {
 				events <- tgEvent
 			}
 		}
@@ -148,6 +148,9 @@ func onFsModification(event fsnotify.Event, fsAdd fsnotifyAdderWrapper, walkRequ
 		} else if (event.Op & fsnotify.CloseWrite) != 0 {
 			// it's a newly created file
 			//log.Println("modified or created file:", event.Name)
+			if fi.Size() == 0 {
+				return
+			}
 			if filter(event.Name) {
 				log.Println(event.Name, "accepted")
 				return event.Name
@@ -166,6 +169,14 @@ func onFsModification(event fsnotify.Event, fsAdd fsnotifyAdderWrapper, walkRequ
 
 func processFile(fname string) (telega.ChattableCloser, error) {
 	log.Println("process file", fname)
+	fi, err := os.Stat(fname)
+	if err != nil {
+		return nil, err
+	}
+	if fi.Size() == 0 {
+		log.Println("ignoring zero-size file:", fname)
+		return nil, nil
+	}
 	switch strings.Split(mime.TypeByExtension(path.Ext(fname)), "/")[0] {
 	case "image":
 		return &telega.ChattablePicture{
@@ -208,6 +219,9 @@ func oneLevelDirectoryWalker(fpaths <-chan string, modifiedFiles chan<- string, 
 					return fs.SkipDir
 				}
 				if strings.Count(fpath, "/") == 0 && filter(fpath) {
+					if info, err := d.Info(); err == nil && info.Size() == 0 {
+						return nil
+					}
 					// it's ok if it blocks. That might happen in two cases:
 					// when there are lots of files in the dir
 					// or telegram bot is not connected to the server.
