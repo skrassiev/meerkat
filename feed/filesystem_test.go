@@ -283,3 +283,52 @@ func TestMIME_Std(t *testing.T) {
 	assert.Equal(t, "video", strings.Split(mime.TypeByExtension(path.Ext("foo/bar/baz/add.mP4")), "/")[0])
 	assert.Equal(t, "image", strings.Split(mime.TypeByExtension(path.Ext("baz/bar/foo/pic.jpG")), "/")[0])
 }
+
+func TestFS_IgnoreZeroSizeFiles(t *testing.T) {
+	fsroot := "test_zero_size"
+	defer cleanup(fsroot)
+	cleanup(fsroot)
+	require.NoError(t, os.MkdirAll(fsroot, 0755))
+
+	// Mock filter that accepts everything
+	filter := func(fpath string) bool { return true }
+
+	// Use monitorDirectoryTree
+	events := make(chan telega.ChattableCloser, 10)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	bgFunc := MonitorDirectoryTree(fsroot, filter)
+	go bgFunc(ctx, events)
+
+	// Wait for walker to start
+	time.Sleep(100 * time.Millisecond)
+
+	// Create a zero-size file
+	zeroFile := path.Join(fsroot, "zero.txt")
+	f, err := os.Create(zeroFile)
+	require.NoError(t, err)
+	f.Close()
+
+	// Create a non-zero-size file
+	nonzeroFile := path.Join(fsroot, "nonzero.txt")
+	err = os.WriteFile(nonzeroFile, []byte("hello"), 0644)
+	require.NoError(t, err)
+
+	// Wait for processing
+	select {
+	case ev := <-events:
+		// We expect only one event (for nonzero.txt)
+		assert.NotNil(t, ev)
+		// Check that no other event arrives
+		select {
+		case ev2 := <-events:
+			t.Errorf("Received unexpected event: %v", ev2)
+		case <-time.After(500 * time.Millisecond):
+			// Success
+		}
+	case <-time.After(2 * time.Second):
+		t.Error("Did not receive any events")
+	}
+}
+
